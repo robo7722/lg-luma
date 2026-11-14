@@ -14,10 +14,26 @@ pub enum Cue {
     Back,
     /// A direction key reached an edge and nothing moved.
     Bump,
+    /// Under the Settings section glide: a faint glass shimmer.
+    Glide,
 }
 
 impl Cue {
-    const ALL: [Self; 4] = [Self::Focus, Self::Select, Self::Back, Self::Bump];
+    const ALL: [Self; 5] = [
+        Self::Focus,
+        Self::Select,
+        Self::Back,
+        Self::Bump,
+        Self::Glide,
+    ];
+
+    /// Mix level; the glide sits far below the clicks.
+    fn gain(self) -> f32 {
+        match self {
+            Self::Glide => 0.3,
+            _ => 1.,
+        }
+    }
 
     fn index(self) -> usize {
         Self::ALL.iter().position(|cue| *cue == self).unwrap()
@@ -29,6 +45,7 @@ impl Cue {
             Self::Select => include_bytes!("../assets/sounds/select.wav"),
             Self::Back => include_bytes!("../assets/sounds/back.wav"),
             Self::Bump => include_bytes!("../assets/sounds/bump.wav"),
+            Self::Glide => include_bytes!("../assets/sounds/glide.wav"),
         }
     }
 }
@@ -83,7 +100,7 @@ struct Voice {
 }
 
 struct Mixer {
-    clips: Arc<[Vec<i16>; 4]>,
+    clips: Arc<[Vec<i16>; 5]>,
     voices: Arc<Mutex<Vec<Voice>>>,
     /// Clip samples per output sample, for devices that do not open at 48 kHz.
     step: f32,
@@ -130,7 +147,14 @@ impl Sounds {
         let mut silent = Self::silent();
         let clips = match Cue::ALL
             .iter()
-            .map(|cue| decode_wav(cue.wav()))
+            .map(|cue| {
+                decode_wav(cue.wav()).map(|samples| {
+                    samples
+                        .into_iter()
+                        .map(|sample| (f32::from(sample) * cue.gain()) as i16)
+                        .collect::<Vec<_>>()
+                })
+            })
             .collect::<Result<Vec<_>, _>>()
         {
             Ok(clips) => clips,
@@ -139,7 +163,7 @@ impl Sounds {
                 return silent;
             }
         };
-        let clips: Arc<[Vec<i16>; 4]> = Arc::new(clips.try_into().unwrap());
+        let clips: Arc<[Vec<i16>; 5]> = Arc::new(clips.try_into().unwrap());
         let audio = match sdl.audio() {
             Ok(audio) => audio,
             Err(error) => {
@@ -203,6 +227,18 @@ mod tests {
     }
 
     #[test]
+    fn the_glide_is_much_quieter_than_the_clicks() {
+        let peak = |cue: Cue| {
+            decode_wav(cue.wav())
+                .unwrap()
+                .iter()
+                .map(|sample| (f32::from(*sample) * cue.gain()).abs())
+                .fold(0., f32::max)
+        };
+        assert!(peak(Cue::Glide) < peak(Cue::Focus) * 0.6);
+    }
+
+    #[test]
     fn malformed_or_unexpected_wavs_are_rejected() {
         assert!(decode_wav(b"nope").is_err());
         let mut bytes = Cue::Focus.wav().to_vec();
@@ -217,7 +253,13 @@ mod tests {
     #[test]
     fn the_mixer_sums_voices_and_drops_finished_ones() {
         use sdl2::audio::AudioCallback;
-        let clips = Arc::new([vec![100i16; 4], vec![i16::MAX; 2], vec![1; 1], vec![1; 1]]);
+        let clips = Arc::new([
+            vec![100i16; 4],
+            vec![i16::MAX; 2],
+            vec![1; 1],
+            vec![1; 1],
+            vec![1; 1],
+        ]);
         let voices = Arc::new(Mutex::new(vec![
             Voice {
                 clip: 0,

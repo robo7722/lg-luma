@@ -10,6 +10,7 @@ Raw material and recipes behind `assets/sounds/*.wav`. Nothing in here is shippe
 | `select.wav`     | `variants/select-b.wav` | double tick (rising)      |
 | `back.wav`       | `variants/back-b.wav`   | double tick (falling)     |
 | `bump.wav`       | `variants/bump-b.wav`   | dull low double tick      |
+| `glide.wav`      | `glide/glide-a.wav`     | three rising soft ticks   |
 
 The user liked `elevenlabs/focus-1.mp3` best. All final sounds are built from that one tick so the set
 sounds consistent. The user did **not** like the first mixes (`variants/first-mix-*.wav`, tick layered
@@ -46,5 +47,13 @@ Then every `select-*`, `back-*`, `bump-*` variant was loudness-matched against `
 (RMS of the samples above 5 % of the peak): target RMS = focus RMS × 1.4 for select and × 1.6
 for back/bump, followed by a soft limiter `tanh(1.2·x) / tanh(1.2)`. Resulting peaks are
 0.75–0.89.
+
+## Glide (Settings section change)
+
+`glide/make.py` (numpy, run with the 40 ms tick decoded to `tick.raw`, 48 kHz mono s16le) renders
+`glide-a` (chosen): the tick at rates 0.85 / 1.0 / 1.18 at 0 / 35 / 70 ms, gains 0.9 / 0.7 / 0.5,
+two-pole lowpass 3.5–4.5 kHz, 150 ms, loudness-matched to `focus.wav` × 1.1 with the same soft
+limiter. `glide-b` (whoosh) and `glide-d` (glass ping) come from `glide/make2.py`; `glide-c` is a
+soft pop. The launcher mixes the glide at 30 % gain.
 
 Licence/origin: see `assets/licenses/ui-sounds.md` (generated with ElevenLabs on a free plan).

@@ -1763,6 +1763,7 @@ fn run() -> Result<(), String> {
                 state.section_started = Some(Instant::now());
                 restart_motion = true;
                 state.dirty = true;
+                state.section_cue();
             }
             shown_section = state.section;
         }

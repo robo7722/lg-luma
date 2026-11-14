@@ -3752,3 +3752,18 @@ fn the_sounds_setting_toggles_in_general() {
     state.activate();
     assert!(state.preferences.ui_sounds);
 }
+
+#[test]
+fn section_glides_get_a_faint_cue_unless_sounds_or_motion_are_off() {
+    use crate::audio::Cue;
+    let mut state = ready();
+    state.section_cue();
+    assert_eq!(state.cues, [Cue::Glide]);
+    state.cues.clear();
+    state.preferences.reduced_motion = true;
+    state.section_cue();
+    state.preferences.reduced_motion = false;
+    state.preferences.ui_sounds = false;
+    state.section_cue();
+    assert!(state.cues.is_empty());
+}

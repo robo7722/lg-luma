@@ -2263,6 +2263,13 @@ impl State {
         effects
     }
 
+    /// A faint shimmer under the Settings section glide, unless sounds or motion are off.
+    pub fn section_cue(&mut self) {
+        if !self.preferences.reduced_motion {
+            self.cue(crate::audio::Cue::Glide);
+        }
+    }
+
     /// OK / Enter (or a pointer click) on the focused target.
     pub fn confirm(&mut self) -> Vec<Effect> {
         self.cue(crate::audio::Cue::Select);
