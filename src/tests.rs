@@ -34,6 +34,18 @@ fn ready() -> State {
     state
 }
 
+/// Hold OK opens the card's menu; its Move action starts reordering.
+fn hold_and_move(state: &mut State) {
+    state.hold();
+    assert!(matches!(
+        state.overlay,
+        Some(crate::state::Overlay::Options { .. })
+    ));
+    state.focus = Target::MoveApp;
+    assert!(state.activate().is_empty());
+    assert!(state.overlay.is_none());
+}
+
 fn manage_apps(state: &mut State) {
     state.open(2);
     state.section = crate::state::APPS_SECTION;
@@ -294,7 +306,7 @@ fn hiding_keeps_the_management_card_available_for_restoring() {
 fn reorder_persists_order_and_keeps_selected_identity() {
     let mut state = ready();
     state.focus = Target::App("netflix".into());
-    state.hold();
+    hold_and_move(&mut state);
     assert_eq!(
         state.direction(Direction::Right, &controls(&state)),
         vec![Effect::Save]
@@ -544,7 +556,7 @@ fn reordering_skips_hidden_and_unavailable_favorite_slots() {
     ]);
     state.preferences.hidden.push("youtube.leanback.v4".into());
     state.focus = Target::App("netflix".into());
-    state.hold();
+    hold_and_move(&mut state);
     state.direction(Direction::Right, &controls(&state));
     assert_eq!(
         state.preferences.favorites.unwrap(),
@@ -3408,7 +3420,7 @@ fn backfilled_dock_apps_can_be_reordered_too() {
     assert_eq!(dock.len(), 6);
     let filler = dock[3].clone();
     state.focus = Target::App(filler.clone());
-    state.hold();
+    hold_and_move(&mut state);
     assert_eq!(state.moving.as_deref(), Some(filler.as_str()));
     assert!(state.overlay.is_none());
     // The visible dock is pinned in its order, so nothing on screen jumps.
@@ -3529,7 +3541,8 @@ fn dock_cards_reorder_while_the_drawer_is_open() {
     state.drawer_visibility = 1.;
     let dock: Vec<String> = state.dock_apps().iter().map(|app| app.id.clone()).collect();
     state.focus = Target::DockApp(dock[0].clone());
-    state.hold();
+    hold_and_move(&mut state);
+    assert_eq!(state.focus, Target::DockApp(dock[0].clone()));
     assert!(state.overlay.is_none());
     assert_eq!(state.moving.as_deref(), Some(dock[0].as_str()));
     assert_eq!(
@@ -3610,4 +3623,86 @@ fn settings_has_a_back_button_to_home() {
     state.focus = Target::SettingsHome;
     state.activate();
     assert_eq!(state.page, Page::Home);
+}
+
+#[test]
+fn running_glides_keep_redrawing_until_they_settle() {
+    let mut state = ready();
+    state.open(2);
+    let started = std::time::Instant::now();
+    state.page_started = Some(started);
+    state.section_started = Some(started);
+    state.dirty = false;
+    state.tick();
+    // Each frame of a glide must be drawn, not only the first one.
+    assert!(state.dirty);
+    assert!(state.page_started.is_some() && state.section_started.is_some());
+    let long_ago = started - std::time::Duration::from_secs(2);
+    state.page_started = Some(long_ago);
+    state.section_started = Some(long_ago);
+    state.panel_started = Some(long_ago);
+    state.dirty = false;
+    state.tick();
+    // One last redraw at rest, then the glides end.
+    assert!(state.dirty);
+    assert!(state.page_started.is_none());
+    assert!(state.section_started.is_none());
+    assert!(state.panel_started.is_none());
+    // Popups keep animating for their whole glide, not just the short fade.
+    state.panel_started = Some(std::time::Instant::now() - std::time::Duration::from_millis(200));
+    state.tick();
+    assert!(state.panel_started.is_some());
+}
+
+#[test]
+fn down_from_the_dock_returns_an_app_to_the_drawer() {
+    let mut state = ready();
+    state.open(1);
+    state.drawer_visibility = 1.;
+    let dock: Vec<String> = state.dock_apps().iter().map(|app| app.id.clone()).collect();
+    let id = dock[2].clone();
+    state.focus = Target::DockApp(id.clone());
+    hold_and_move(&mut state);
+    assert_eq!(
+        state.direction(Direction::Down, &controls(&state)),
+        vec![Effect::Save]
+    );
+    // It left the favorites and sits in the drawer's first row below its column.
+    assert!(
+        !state
+            .preferences
+            .favorites(&state.inventory.apps)
+            .contains(&id)
+    );
+    assert!(!state.dock_apps().iter().any(|app| app.id == id));
+    let drawer: Vec<String> = state
+        .drawer_apps()
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert_eq!(drawer[2], id);
+    assert_eq!(state.focus, Target::App(id.clone()));
+    assert_eq!(state.moving.as_deref(), Some(id.as_str()));
+    // And Up brings it back into the dock.
+    state.direction(Direction::Up, &controls(&state));
+    assert_eq!(state.dock_apps()[2].id, id);
+    state.back();
+    assert!(state.moving.is_none());
+}
+
+#[test]
+fn holding_a_dock_card_opens_its_menu_with_move() {
+    let mut state = ready();
+    let id = state.dock_apps()[0].id.clone();
+    state.focus = Target::App(id.clone());
+    state.hold();
+    assert!(state.moving.is_none());
+    assert!(matches!(
+        state.overlay,
+        Some(crate::state::Overlay::Options { .. })
+    ));
+    let targets: Vec<_> = controls(&state).into_iter().map(|c| c.target).collect();
+    assert!(targets.contains(&Target::OpenApp));
+    assert!(targets.contains(&Target::MoveApp));
+    assert!(targets.contains(&Target::Option(1)));
 }

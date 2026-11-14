@@ -3429,7 +3429,9 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
     };
     let movable = !shortcut
         && !background
-        && ((state.managing_apps() && favorite) || state.drawer_movable(id))
+        && ((state.managing_apps() && favorite)
+            || state.drawer_movable(id)
+            || (!state.managing_apps() && state.dock_movable(id)))
         && !state.preferences.hidden.iter().any(|item| item == id);
     let height = if shortcut {
         176.

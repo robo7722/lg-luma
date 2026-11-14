@@ -978,31 +978,6 @@ fn run() -> Result<(), String> {
             last_minute = Some(clock_slot);
             state.dirty = true;
         }
-        // Entering or leaving Settings glides the page in; Home ↔ Apps keeps the drawer motion.
-        if state.page != shown_page {
-            // Scripted captures run frames faster than wall-clock motion; keep them static.
-            if options.script.is_empty()
-                && (matches!(state.page, state::Page::Settings)
-                    || matches!(shown_page, state::Page::Settings))
-            {
-                state.page_started = Some(Instant::now());
-                restart_motion = true;
-            }
-            shown_page = state.page;
-            shown_section = state.section;
-        }
-        // Switching Settings sections slides the new section's content in beside the sidebar.
-        if state.section != shown_section {
-            if state.page == state::Page::Settings && options.script.is_empty() {
-                state.section_started = Some(Instant::now());
-                restart_motion = true;
-            }
-            shown_section = state.section;
-        }
-        if state.panel_started != seen_panel {
-            restart_motion |= state.panel_started.is_some();
-            seen_panel = state.panel_started;
-        }
         state.tick();
         wallpaper_service.set_active(wallpaper_upload_active(&state, webos, focused, visible));
         while let Ok(event) = wallpaper_service.receiver.try_recv() {
@@ -1762,6 +1737,35 @@ fn run() -> Result<(), String> {
                 video.text_input().stop();
             }
             text_active = keyboard;
+        }
+        // Entering or leaving Settings glides the page in; Home ↔ Apps keeps the drawer motion.
+        // Checked after input and right before drawing, so the first frame of a new page is
+        // already part of the glide instead of popping in at full opacity.
+        if state.page != shown_page {
+            // Scripted captures run frames faster than wall-clock motion; keep them static.
+            if options.script.is_empty()
+                && (matches!(state.page, state::Page::Settings)
+                    || matches!(shown_page, state::Page::Settings))
+            {
+                state.page_started = Some(Instant::now());
+                restart_motion = true;
+                state.dirty = true;
+            }
+            shown_page = state.page;
+            shown_section = state.section;
+        }
+        // Switching Settings sections slides the new section's content in beside the sidebar.
+        if state.section != shown_section {
+            if state.page == state::Page::Settings && options.script.is_empty() {
+                state.section_started = Some(Instant::now());
+                restart_motion = true;
+                state.dirty = true;
+            }
+            shown_section = state.section;
+        }
+        if state.panel_started != seen_panel {
+            restart_motion |= state.panel_started.is_some();
+            seen_panel = state.panel_started;
         }
         let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit)
             || (visible

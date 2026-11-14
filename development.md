@@ -110,7 +110,7 @@ and the generic disc input icon from the native desktop renderer using seeded lo
 | ----------------------------- | ---------------------------------------------------------------------------- |
 | Arrows                        | Move focus. Down from favorites opens the drawer, Up reaches corner controls |
 | OK / Enter                    | Activate on release                                                          |
-| Hold OK for 600 ms            | Reorder Home favorite or open app options                                    |
+| Hold OK for 600 ms            | Open the card's menu; Move reorders dock and drawer apps                     |
 | OK or Back in move mode       | Finish reordering without launching                                          |
 | Escape / Back / Backspace     | Parent navigation, overlay dismissal or Recent apps from Home                |
 | Hold Back / Escape for 600 ms | Open Recent apps while Luma is focused                                       |
@@ -128,7 +128,7 @@ worker without changing preferences. An active icon read finishes before disk en
 removed, so it cannot restore stale artwork after the reset.
 Home, the app drawer, Inputs and Recent apps launch directly on OK/click. **Settings → Apps** uses
 a three-column artwork gallery like Backgrounds, including hidden apps, and opens the action popup with **Open**, favorite, hide/show and
-**Delete app** actions. Hold OK on Home still reorders favorites.
+**Delete app** actions. Hold OK on Home opens the same menu with Move.
 Background cards open the same side popup with **Use background** first and **Delete background**
 only for inactive backgrounds. Deletion requires confirmation with **Cancel** focused by default.
 Uploaded images are deleted on the wallpaper worker; bundled assets remain in the package, with
@@ -367,7 +367,10 @@ Entering or leaving Settings glides the page 80 px up while it fades in (0.45 s,
 switching Settings sections slides the section content 72 px in from the right (0.34 s). The event
 loop starts both when the page or section changes, so unit-test scenes stay static, and restarts any
 motion that began in a frame once that frame is presented: a page the TV has not drawn before can take
-longer to lay out than the animation lasts. Scripted desktop captures skip page and section glides. The clock/input
+longer to lay out than the animation lasts. Scripted desktop captures skip page and section glides.
+The main loop only draws when `State::dirty` is set, so `State::tick` marks every running page,
+section and popup glide dirty and clears it with one final redraw at rest; page and section changes
+are detected after input, right before drawing, so a new page's first frame is already gliding. The clock/input
 menus drop 14 px, dialogs rise 18 px, option panels slide 16 px from their card and subpages slide
 56 px, over 0.28 s. Only drawn geometry moves; hit targets stay at their final rects. Reduce motion
 disables all of it.

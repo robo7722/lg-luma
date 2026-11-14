@@ -166,7 +166,7 @@ fn home_keeps_pinned_order_without_extra_labels_even_while_reordering() {
         ["amazon", "netflix", "youtube.leanback.v4"]
     );
     assert_eq!(state.focus, Target::App("amazon".into()));
-    state.hold();
+    super::hold_and_move(&mut state);
     let rendered = scene(&state);
     for label in ["apps", "moveApps"] {
         assert!(!rendered.draw.iter().any(|draw| matches!(draw,
