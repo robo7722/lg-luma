@@ -67,7 +67,8 @@ void main() {
             float rim = 1.0 - smoothstep(0.0, bevel, depth);
             // Bounded curved-lens profile, not a wide painted bevel.
             float slope = rim * rim;
-            vec2 uv = (vec2(v_logical_x, v_logical_y) - normal * slope * 9.0) / vec2(1920.0, 1080.0);
+            // Liquid Glass: a stronger curved-lens refraction near the rim.
+            vec2 uv = (vec2(v_logical_x, v_logical_y) - normal * slope * 14.0) / vec2(1920.0, 1080.0);
             float scattering = mix(0.25, 0.88, smoothstep(0.0, bevel * 2.0, depth));
             vec3 backdrop = glass_sample(uv, scattering) * u_glass_dim;
             float luminance = dot(backdrop, vec3(0.2126, 0.7152, 0.0722));
@@ -78,7 +79,11 @@ void main() {
             float light = dot(normal, normalize(vec2(-0.55, -1.0)));
             float specular = pow(abs(light), 5.0);
             float hairline = 1.0 - smoothstep(0.0, 1.25, depth);
-            color += vec3(hairline * (0.07 + specular * 0.24) + slope * specular * 0.045);
+            color += vec3(hairline * (0.09 + specular * 0.34) + slope * specular * 0.07);
+            // Light caught inside the rim, and a soft sheen across the upper part of the surface.
+            color += vec3(rim * 0.035);
+            float top = clamp(-v_shape.y / max(half_size.y, 1.0), 0.0, 1.0);
+            color += vec3(0.055 * top * top * (1.0 - focused));
         }
         gl_FragColor = vec4(color, alpha * v_color.a * edge_coverage());
         return;

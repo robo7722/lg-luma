@@ -3398,3 +3398,96 @@ fn evening_mode_is_chosen_in_general_settings_and_restores_its_row() {
     invalid.sanitize();
     assert_eq!(invalid.evening_dim, None);
 }
+
+#[test]
+fn backfilled_dock_apps_can_be_reordered_too() {
+    let mut state = ready();
+    // Two favorites; the dock backfills four more apps.
+    state.preferences.favorites = Some(vec!["netflix".into(), "youtube.leanback.v4".into()]);
+    let dock: Vec<String> = state.dock_apps().iter().map(|app| app.id.clone()).collect();
+    assert_eq!(dock.len(), 6);
+    let filler = dock[3].clone();
+    state.focus = Target::App(filler.clone());
+    state.hold();
+    assert_eq!(state.moving.as_deref(), Some(filler.as_str()));
+    assert!(state.overlay.is_none());
+    // The visible dock is pinned in its order, so nothing on screen jumps.
+    assert_eq!(state.preferences.favorites.as_deref(), Some(&dock[..]));
+    assert_eq!(
+        state.direction(Direction::Left, &controls(&state)),
+        vec![Effect::Save]
+    );
+    let moved = state.preferences.favorites.clone().unwrap();
+    assert_eq!(moved[2], filler);
+    assert_eq!(moved[3], dock[2]);
+}
+
+#[test]
+fn drawer_apps_move_in_the_grid_and_keep_a_custom_order() {
+    use crate::model::AppSorting;
+    let mut state = ready();
+    state.open(1);
+    state.drawer_visibility = 1.;
+    let before: Vec<String> = state
+        .drawer_apps()
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert!(before.len() > crate::state::APPS_COLUMNS + 1);
+    let id = before[0].clone();
+    state.focus = Target::App(id.clone());
+    state.options();
+    assert!(
+        controls(&state)
+            .iter()
+            .any(|control| control.target == Target::MoveApp)
+    );
+    state.focus = Target::MoveApp;
+    assert!(state.activate().is_empty());
+    assert!(state.overlay.is_none());
+    assert_eq!(state.moving.as_deref(), Some(id.as_str()));
+    // Right swaps with the neighbour; Down moves one row (six columns) further.
+    assert_eq!(
+        state.direction(Direction::Right, &controls(&state)),
+        vec![Effect::Save]
+    );
+    assert_eq!(state.preferences.app_sorting, AppSorting::Custom);
+    let order: Vec<String> = state
+        .drawer_apps()
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert_eq!(order[1], id);
+    assert_eq!(order[0], before[1]);
+    state.direction(Direction::Down, &controls(&state));
+    let order: Vec<String> = state
+        .drawer_apps()
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert_eq!(order[1 + crate::state::APPS_COLUMNS], id);
+    // Up from the first row and moves past the end are ignored.
+    state.direction(Direction::Up, &controls(&state));
+    state.direction(Direction::Up, &controls(&state));
+    assert!(state.direction(Direction::Up, &controls(&state)).is_empty());
+    assert_eq!(state.focus, Target::App(id.clone()));
+    assert!(state.back().is_empty());
+    assert!(state.moving.is_none());
+    // The order survives a reload.
+    let saved = serde_json::to_string(&state.preferences).unwrap();
+    let mut restored = State::new(serde_json::from_str(&saved).unwrap());
+    restored.set_inventory(demo_inventory(), None);
+    let reloaded: Vec<String> = restored
+        .drawer_apps()
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert_eq!(
+        reloaded,
+        state
+            .drawer_apps()
+            .iter()
+            .map(|app| app.id.clone())
+            .collect::<Vec<_>>()
+    );
+}

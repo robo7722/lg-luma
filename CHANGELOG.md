@@ -5,6 +5,8 @@
 ### Minor Changes
 
 - Show a time-of-day greeting on Home again (Settings → Widgets → Greeting) and add an evening mode in Settings → General that dims the background and glass surfaces from a chosen hour until 06:00.
+- Reorder apps in the drawer below the dock: Move in an app's menu places it with the arrow keys and switches App sorting to the new Custom order. Holding OK now also reorders backfilled dock cards, pinning the visible dock.
+- Liquid Glass surfaces refract more strongly at the rim, with a brighter edge light and a soft top sheen.
 
 ### Patch Changes
 

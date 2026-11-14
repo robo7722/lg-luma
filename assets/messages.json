@@ -4724,5 +4724,22 @@
     "sv": "Från {time}",
     "cs": "Od {time}",
     "ca": "A partir de les {time}"
+  },
+  "appSortingCustom": {
+    "en": "Custom order",
+    "de": "Eigene Reihenfolge",
+    "es": "Orden personalizado",
+    "zh": "自定义顺序",
+    "zh-tw": "自訂順序",
+    "pt": "Ordem personalizada",
+    "it": "Ordine personalizzato",
+    "ru": "Свой порядок",
+    "pl": "Własna kolejność",
+    "fr": "Ordre personnalisé",
+    "vi": "Thứ tự tùy chỉnh",
+    "nl": "Eigen volgorde",
+    "sv": "Egen ordning",
+    "cs": "Vlastní pořadí",
+    "ca": "Ordre personalitzat"
   }
 }

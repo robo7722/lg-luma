@@ -104,13 +104,15 @@ fn app_sorting_picker_supports_remote_pointer_and_parent_navigation() {
         state.activate();
         assert_eq!(state.subpage, Some(Subpage::AppSorting));
         let rendered = scene(&state);
-        for label in ["Alphabetically", "Usage count"] {
+        for label in ["Alphabetically", "Usage count", "Custom order"] {
             assert!(rendered.draw.iter().any(|draw| matches!(draw,
                 Draw::Text(text, ..) if text == label)));
         }
         assert_eq!(state.focus, Target::Choice(0));
         state.direction(Direction::Down, &controls(&state));
         assert_eq!(state.focus, Target::Choice(1));
+        state.direction(Direction::Down, &controls(&state));
+        assert_eq!(state.focus, Target::Choice(2));
         state.direction(Direction::Down, &controls(&state));
         assert_eq!(state.focus, Target::Choice(0));
         state.direction(Direction::Down, &controls(&state));

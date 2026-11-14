@@ -34,7 +34,9 @@ Home uses Liquid Glass controls over your wallpaper, a floating favorites dock, 
 block with a condition icon, temperature, condition, and location. The greeting and standalone
 date have been removed.
 
-- **Left / Right** browses favorites. Hold **OK** to reorder them.
+- **Left / Right** browses favorites. Hold **OK** to reorder any card in the dock.
+- In the app drawer below the dock, hold **OK** on an app and choose **Move**, then use the arrows
+  to place it. The drawer then keeps this **Custom order** (Settings → General → App sorting).
 - **Down** from favorites opens the animated six-column app drawer.
 - **Up** from favorites reaches the corner controls.
 - **Back** closes the drawer and focuses the first favorite.

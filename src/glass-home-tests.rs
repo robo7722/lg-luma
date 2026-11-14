@@ -798,12 +798,6 @@ fn settings_move_action_reorders_only_saved_favorites() {
     state.back();
     assert!(state.moving.is_none());
     let filler = state.dock_apps()[2].id.clone();
-    state.focus = Target::App(filler.clone());
-    state.hold();
-    assert!(
-        state.moving.is_none(),
-        "backfilled cards cannot enter reorder mode"
-    );
     manage_apps(&mut state);
     state.focus = Target::App(filler);
     state.options();

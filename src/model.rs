@@ -218,15 +218,18 @@ pub enum AppSorting {
     #[default]
     Alphabetical,
     Usage,
+    /// The order chosen with Move in the app drawer (`Preferences::app_order`).
+    Custom,
 }
 
 impl AppSorting {
-    pub const ALL: [Self; 2] = [Self::Alphabetical, Self::Usage];
+    pub const ALL: [Self; 3] = [Self::Alphabetical, Self::Usage, Self::Custom];
 
     pub fn label_key(self) -> &'static str {
         match self {
             Self::Alphabetical => "appSortingAlphabetical",
             Self::Usage => "appSortingUsage",
+            Self::Custom => "appSortingCustom",
         }
     }
 }
@@ -262,6 +265,8 @@ pub struct Preferences {
     pub weather_style: WeatherStyle,
     pub app_sorting: AppSorting,
     pub app_launch_counts: BTreeMap<String, u64>,
+    /// Manual app drawer order for `AppSorting::Custom`; unlisted apps follow alphabetically.
+    pub app_order: Vec<String>,
     pub favorites: Option<Vec<String>>,
     pub custom_tiles: Vec<CustomTile>,
     pub hidden: Vec<String>,
@@ -332,6 +337,7 @@ impl Default for Preferences {
             weather_style: WeatherStyle::default(),
             app_sorting: AppSorting::default(),
             app_launch_counts: BTreeMap::new(),
+            app_order: vec![],
             favorites: None,
             custom_tiles: vec![],
             hidden: vec![],
@@ -367,6 +373,15 @@ impl Preferences {
         let count = match self.app_sorting {
             AppSorting::Alphabetical => std::cmp::Ordering::Equal,
             AppSorting::Usage => usage(b).cmp(&usage(a)),
+            AppSorting::Custom => {
+                let rank = |app: &App| {
+                    self.app_order
+                        .iter()
+                        .position(|id| id == &app.id)
+                        .unwrap_or(usize::MAX)
+                };
+                rank(a).cmp(&rank(b))
+            }
         };
         count
             .then_with(|| a.title.to_lowercase().cmp(&b.title.to_lowercase()))
@@ -516,6 +531,7 @@ impl Preferences {
         if let Some(ids) = &mut self.favorites {
             clean(ids);
         }
+        clean(&mut self.app_order);
         clean(&mut self.hidden);
         {
             let mut seen = HashSet::new();
