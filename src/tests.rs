@@ -3491,3 +3491,36 @@ fn drawer_apps_move_in_the_grid_and_keep_a_custom_order() {
             .collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn settings_glides_in_without_moving_hit_targets_unless_motion_is_reduced() {
+    use crate::renderer::Draw;
+    let mut state = ready();
+    state.open(2);
+    let settled = scene(&state);
+    state.page_started = Some(std::time::Instant::now());
+    assert!(state.animating());
+    let gliding = scene(&state);
+    assert_eq!(
+        settled
+            .controls
+            .iter()
+            .map(|c| c.rect.y)
+            .collect::<Vec<_>>(),
+        gliding
+            .controls
+            .iter()
+            .map(|c| c.rect.y)
+            .collect::<Vec<_>>()
+    );
+    let first_text = |scene: &crate::view::Scene| {
+        scene.draw.iter().find_map(|draw| match draw {
+            Draw::Text(label, rect, ..) if label == "General" => Some(rect.y),
+            _ => None,
+        })
+    };
+    assert!(first_text(&gliding).unwrap() > first_text(&settled).unwrap());
+    state.preferences.reduced_motion = true;
+    assert!(state.page_transition().is_none());
+    assert_eq!(first_text(&scene(&state)), first_text(&settled));
+}

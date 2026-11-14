@@ -267,7 +267,23 @@ fn control_center_uses_separate_floating_actions_and_preserves_navigation() {
     let mut state = ready();
     state.focus = Target::SettingsMenu;
     state.activate();
+    // The menu drops in with a short glide; hit targets never move, drawn layout settles.
+    assert!(state.panel_started.is_some());
+    let opening = scene(&state);
+    state.panel_started = None;
     let rendered = scene(&state);
+    assert_eq!(
+        opening
+            .controls
+            .iter()
+            .map(|c| c.rect.y)
+            .collect::<Vec<_>>(),
+        rendered
+            .controls
+            .iter()
+            .map(|c| c.rect.y)
+            .collect::<Vec<_>>()
+    );
     assert_eq!(rendered.controls.len(), 2);
     for control in &rendered.controls {
         assert_eq!(control.rect.x + control.rect.w, 1836.);

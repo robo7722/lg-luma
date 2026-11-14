@@ -32,6 +32,14 @@ pub const HOME_TILE_PITCH: f32 = 296.4;
 pub const HOME_FADE_LEFT: f32 = 60.;
 pub const HOME_FADE_RIGHT: f32 = 1860.;
 pub const BACKGROUND_FADE: f32 = 0.4;
+/// Seconds for the Liquid Glass page glide and popup bloom.
+pub const PAGE_TRANSITION: f32 = 0.32;
+pub const POPUP_TRANSITION: f32 = 0.2;
+
+/// Cubic ease-out: quick start, soft landing, like a glass sheet settling.
+pub fn ease_out(t: f32) -> f32 {
+    1. - (1. - t.clamp(0., 1.)).powi(3)
+}
 pub const CYCLE_FADE: f32 = 1.6;
 
 pub fn unix_now() -> u64 {
@@ -263,6 +271,8 @@ pub struct State {
     /// Luma update (Settings → System), driven by the update worker.
     pub update: crate::update::InstallStatus,
     pub panel_started: Option<Instant>,
+    /// Start of the glide between Home/Apps and Settings, set by the event loop.
+    pub page_started: Option<Instant>,
     pub weather: weather::Weather,
     pub keyboard_field: TextField,
     pub greeting_name_draft: String,
@@ -311,6 +321,7 @@ impl State {
             tile_editor: None,
             update: crate::update::InstallStatus::default(),
             panel_started: None,
+            page_started: None,
             weather: weather::Weather::default(),
             keyboard_field: TextField::Apps,
             greeting_name_draft: String::new(),
@@ -514,8 +525,18 @@ impl State {
         }
     }
 
+    /// Eased progress (0 → 1) of the page glide, while it runs.
+    pub fn page_transition(&self) -> Option<f32> {
+        let started = self
+            .page_started
+            .filter(|_| !self.preferences.reduced_motion)?;
+        let t = started.elapsed().as_secs_f32() / PAGE_TRANSITION;
+        (t < 1.).then(|| ease_out(t))
+    }
+
     pub fn animating(&self) -> bool {
-        (self.drawer_visibility != if self.page == Page::Apps { 1. } else { 0. })
+        self.page_transition().is_some()
+            || (self.drawer_visibility != if self.page == Page::Apps { 1. } else { 0. })
             || (!self.preferences.reduced_motion
                 && self.input_status_visibility.iter().any(|(id, value)| {
                     *value != if self.input_status_active(id) { 1. } else { 0. }
@@ -2423,6 +2444,9 @@ impl State {
             Target::Nav(index) => self.open(if index == 2 { 0 } else { index }),
             Target::InputsMenu => {
                 self.overlay = Some(Overlay::Inputs);
+                if !self.preferences.reduced_motion {
+                    self.panel_started = Some(Instant::now());
+                }
                 self.focus = self
                     .inventory
                     .inputs
@@ -2433,6 +2457,9 @@ impl State {
             Target::SettingsMenu => {
                 self.overlay = Some(Overlay::Settings);
                 self.focus = Target::LumaSettings;
+                if !self.preferences.reduced_motion {
+                    self.panel_started = Some(Instant::now());
+                }
             }
             Target::LumaSettings => {
                 self.open(2);

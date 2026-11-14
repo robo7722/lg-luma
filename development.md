@@ -361,6 +361,14 @@ updates, and normal/takeover launches using the shared preferences location use 
 Custom images are not used as LG's launch splash: runtime splash updates are skipped for them,
 and takeover boot staging uses a bundled fallback.
 
+### Liquid Glass motion
+
+Entering or leaving Settings glides the page 28 px up while it fades in (0.32 s, cubic ease-out);
+the event loop starts it when the page changes, so unit-test scenes stay static. The clock/input
+menus drop 14 px, dialogs rise 18 px, option panels slide 16 px from their card and subpages slide
+24 px, over 0.2 s. Only drawn geometry moves; hit targets stay at their final rects. Reduce motion
+disables all of it.
+
 ### Bing image of the day
 
 The `luma-bing` worker, started with the wallpaper service and stopped when it is dropped, keeps a

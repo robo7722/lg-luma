@@ -266,6 +266,54 @@ impl Scene {
             }
         }
     }
+    /// Moves draws from `from` by (dx, dy); hit targets stay put, so motion never moves a control.
+    fn shift(&mut self, from: usize, dx: f32, dy: f32) {
+        if dx == 0. && dy == 0. {
+            return;
+        }
+        let shift = |rect: &mut Rect| {
+            rect.x += dx;
+            rect.y += dy;
+        };
+        for draw in &mut self.draw[from..] {
+            match draw {
+                Draw::Glass(rect, ..)
+                | Draw::Shape(rect, ..)
+                | Draw::RoundedGradient(rect, ..)
+                | Draw::Shadow(rect, ..)
+                | Draw::Text(_, rect, ..)
+                | Draw::Image(_, rect, ..)
+                | Draw::TintedImage(_, rect, ..)
+                | Draw::AppImage(_, rect, ..)
+                | Draw::Clip(Some(rect)) => shift(rect),
+                Draw::EdgeFade(Some(edges)) => edges.iter_mut().for_each(|y| *y += dy),
+                Draw::EdgeFadeX(Some(edges)) => edges.iter_mut().for_each(|x| *x += dx),
+                Draw::Clip(None) | Draw::EdgeFade(None) | Draw::EdgeFadeX(None) => {}
+            }
+        }
+    }
+
+    /// Liquid Glass entrance: fades in while gliding the last few pixels into place.
+    fn glide(
+        &mut self,
+        from: usize,
+        started: Option<std::time::Instant>,
+        duration: f32,
+        dx: f32,
+        dy: f32,
+    ) {
+        let Some(started) = started else {
+            return;
+        };
+        let t = started.elapsed().as_secs_f32() / duration;
+        if t >= 1. {
+            return;
+        }
+        let eased = crate::state::ease_out(t);
+        self.fade(from, eased, 1.);
+        self.shift(from, dx * (1. - eased), dy * (1. - eased));
+    }
+
     fn fade(&mut self, from: usize, alpha: f32, brightness: f32) {
         for draw in &mut self.draw[from..] {
             let apply = |color: &mut Color| {
@@ -609,11 +657,24 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
         }
         out.control(Target::Retry, retry, false);
     }
+    if let Some(eased) = state.page_transition() {
+        out.fade(content_start, eased, 1.);
+        out.shift(content_start, 0., 28. * (1. - eased));
+    }
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
     header(&mut out, state, assets, now);
     if matches!(state.overlay, Some(Overlay::Inputs | Overlay::Settings)) {
+        let start = out.draw.len();
         corner_menu(&mut out, state, assets);
+        // Drops down from the clock / input pills it belongs to.
+        out.glide(
+            start,
+            state.panel_started,
+            crate::state::POPUP_TRANSITION,
+            0.,
+            -14.,
+        );
     }
     if let Some(
         overlay @ (Overlay::Options { .. }
@@ -669,6 +730,11 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
         ) && let Some(opened) = state.panel_started
         {
             out.fade(start, (opened.elapsed().as_secs_f32() / 0.12).min(1.), 1.);
+            // The dialog rises a little above its dimmed backdrop.
+            let t = opened.elapsed().as_secs_f32() / crate::state::POPUP_TRANSITION;
+            if t < 1. {
+                out.shift(start + 1, 0., 18. * (1. - crate::state::ease_out(t)));
+            }
         }
     }
     if state.recents_open() || state.recents.visibility > 0. {
@@ -2277,6 +2343,13 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
             if let Some(opened) = state.panel_started {
                 out.fade(start, (opened.elapsed().as_secs_f32() / 0.15).min(1.), 1.);
             }
+            out.glide(
+                start,
+                state.panel_started,
+                crate::state::POPUP_TRANSITION,
+                24.,
+                0.,
+            );
             return;
         }
         let evening_labels: Vec<String> = crate::model::EVENING_HOURS
@@ -2429,6 +2502,14 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
         if let Some(opened) = state.panel_started {
             out.fade(start, (opened.elapsed().as_secs_f32() / 0.15).min(1.), 1.);
         }
+        // Subpages slide in from the side they open towards.
+        out.glide(
+            start,
+            state.panel_started,
+            crate::state::POPUP_TRANSITION,
+            24.,
+            0.,
+        );
         return;
     }
     match state.section {
@@ -3479,6 +3560,13 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
             (opened.elapsed().as_secs_f32() / 0.12).min(1.),
             1.,
         );
+        // The action panel slides out from the lifted card beside it.
+        let t = opened.elapsed().as_secs_f32() / crate::state::POPUP_TRANSITION;
+        if t < 1. {
+            let from_left = anchor.is_none_or(|card| panel.x > card.x);
+            let dx = if from_left { -16. } else { 16. };
+            out.shift(panel_start, dx * (1. - crate::state::ease_out(t)), 0.);
+        }
     }
 }
 

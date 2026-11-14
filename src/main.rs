@@ -936,6 +936,7 @@ fn run() -> Result<(), String> {
     let mut press: Option<Press> = None;
     let mut back_button = BackButton::default();
     let mut last_minute = None;
+    let mut shown_page = state.page;
     let mut frame = 0u64;
     let mut visible = true;
     let mut running = true;
@@ -971,6 +972,15 @@ fn run() -> Result<(), String> {
         if last_minute != Some(clock_slot) {
             last_minute = Some(clock_slot);
             state.dirty = true;
+        }
+        // Entering or leaving Settings glides the page in; Home ↔ Apps keeps the drawer motion.
+        if state.page != shown_page {
+            if matches!(state.page, state::Page::Settings)
+                || matches!(shown_page, state::Page::Settings)
+            {
+                state.page_started = Some(Instant::now());
+            }
+            shown_page = state.page;
         }
         state.tick();
         wallpaper_service.set_active(wallpaper_upload_active(&state, webos, focused, visible));
