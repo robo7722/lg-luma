@@ -1,5 +1,19 @@
 # lg-luma
 
+## 3.3.0
+
+### Minor Changes
+
+- Show a time-of-day greeting on Home again (Settings → Widgets → Greeting) and add an evening mode in Settings → General that dims the background and glass surfaces from a chosen hour until 06:00.
+- Reorder apps in the drawer below the dock: Move in an app's menu places it with the arrow keys and switches App sorting to the new Custom order. Holding OK now also reorders backfilled dock cards, pinning the visible dock.
+- Liquid Glass surfaces are clearer and refract more strongly at the rim, with a brighter edge light and a soft top sheen. Settings glides in, menus drop from the clock and input pills, dialogs rise and subpages slide in with an ease-out; Reduce motion turns this off.
+
+### Patch Changes
+
+- Replace the weather icons with original, flat and colourful MIT artwork; drizzle and rain now look different.
+- Show where today's Bing image was taken, small below the dock on Home while it is the background.
+- Show Zattoo with a colourful original TV icon (white-framed screen with "TV") instead of its monochrome wordmark, and use the Plex logo for the PlxNative app (`com.beb.plxnative`).
+
 ## 3.2.1
 
 ### Patch Changes

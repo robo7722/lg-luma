@@ -238,6 +238,7 @@ fn gallery_capacity_is_checked_before_decoding_or_creating_another_upload() {
             &serde_json::to_vec(&Wallpaper {
                 id,
                 version: None,
+                caption: None,
                 directory: directory.clone(),
                 has_original: false,
             })
@@ -551,17 +552,18 @@ fn cancelling_a_slow_request_releases_the_worker_without_waiting_for_the_body() 
 
 const BING_REPLY: &str = r#"{"images":[{"startdate":"20261113","fullstartdate":"202611132300",
 "url":"/th?id=OHR.BlueHK_DE-DE1662761141_1920x1080.jpg&rf=LaDigue_1920x1080.jpg&pid=hp",
-"urlbase":"/th?id=OHR.BlueHK_DE-DE1662761141","copyright":"Victoria Harbour"}],
+"urlbase":"/th?id=OHR.BlueHK_DE-DE1662761141","copyright":"Victoria Harbour (© Juan Romero/Cavan Images)"}],
 "tooltips":{"loading":"Wird geladen..."}}"#;
 
 #[test]
 fn bing_archive_replies_yield_a_fixed_origin_full_hd_url() {
     assert_eq!(
         parse_bing(BING_REPLY.as_bytes()).unwrap(),
-        (
-            "20261113".into(),
-            "https://www.bing.com/th?id=OHR.BlueHK_DE-DE1662761141_1920x1080.jpg".into()
-        )
+        BingRelease {
+            version: "20261113".into(),
+            url: "https://www.bing.com/th?id=OHR.BlueHK_DE-DE1662761141_1920x1080.jpg".into(),
+            caption: Some("Victoria Harbour".into()),
+        }
     );
     for reply in [
         "not json",
@@ -584,6 +586,7 @@ fn bing_ids_and_versioned_paths_stay_separate_from_uploads() {
     let item = Wallpaper {
         id: BING_ID.into(),
         version: Some("20261113".into()),
+        caption: None,
         directory: PathBuf::from("/w/bing-daily"),
         has_original: true,
     };
@@ -598,8 +601,8 @@ fn bing_ids_and_versioned_paths_stay_separate_from_uploads() {
 fn daily_images_replace_the_previous_day_without_taking_a_gallery_slot() {
     let fixture = Fixture::new();
     let directory = fixture.wallpapers();
-    install_bing(&directory, "20261112", &image(1920, 1080)).unwrap();
-    install_bing(&directory, "20261113", &image(1920, 1080)).unwrap();
+    install_bing(&directory, "20261112", None, &image(1920, 1080)).unwrap();
+    install_bing(&directory, "20261113", None, &image(1920, 1080)).unwrap();
     let items = catalog(&directory);
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].id, BING_ID);
@@ -608,7 +611,7 @@ fn daily_images_replace_the_previous_day_without_taking_a_gallery_slot() {
     assert_eq!(image::open(items[0].image()).unwrap().width(), 1920);
     assert_eq!(bing_version(&directory).as_deref(), Some("20261113"));
     // Two days are kept, so a texture still drawn from yesterday's path survives the switch.
-    install_bing(&directory, "20261114", &image(1920, 1080)).unwrap();
+    install_bing(&directory, "20261114", None, &image(1920, 1080)).unwrap();
     let mut files: Vec<_> = fs::read_dir(directory.join(BING_ID))
         .unwrap()
         .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
@@ -629,8 +632,8 @@ fn daily_images_replace_the_previous_day_without_taking_a_gallery_slot() {
     // No staging directories remain.
     assert_eq!(fs::read_dir(&directory).unwrap().count(), 1);
     // Wrong dimensions or invalid versions never replace the current image.
-    assert!(install_bing(&directory, "20261115", &image(1280, 720)).is_err());
-    assert!(install_bing(&directory, "../../x", &image(1920, 1080)).is_err());
+    assert!(install_bing(&directory, "20261115", None, &image(1280, 720)).is_err());
+    assert!(install_bing(&directory, "../../x", None, &image(1920, 1080)).is_err());
     assert_eq!(bing_version(&directory).as_deref(), Some("20261114"));
     assert_eq!(fs::read_dir(&directory).unwrap().count(), 1);
     // It can never be deleted, even when not selected.
@@ -643,7 +646,7 @@ fn daily_images_replace_the_previous_day_without_taking_a_gallery_slot() {
 fn the_bing_tile_does_not_count_toward_the_upload_limit() {
     let fixture = Fixture::new();
     let directory = fixture.wallpapers();
-    install_bing(&directory, "20261113", &image(1920, 1080)).unwrap();
+    install_bing(&directory, "20261113", None, &image(1920, 1080)).unwrap();
     for index in 0..MAX_WALLPAPERS - 1 {
         let id = format!("custom-{index:032x}");
         let path = directory.join(&id);
@@ -651,6 +654,7 @@ fn the_bing_tile_does_not_count_toward_the_upload_limit() {
         let item = Wallpaper {
             id,
             version: None,
+            caption: None,
             directory: path.clone(),
             has_original: false,
         };
@@ -687,4 +691,31 @@ fn sharpening_keeps_flat_areas_and_raises_edge_contrast() {
     assert!(edge.get_pixel(3, 4)[0] < 60 && edge.get_pixel(4, 4)[0] > 180);
     assert_eq!(edge.get_pixel(0, 4)[0], 60);
     assert_eq!(edge.get_pixel(7, 4)[0], 180);
+}
+
+#[test]
+fn bing_captions_keep_the_place_and_drop_the_credit() {
+    assert_eq!(
+        bing_caption("Victoria Harbour, Hongkong, China (© Juan Romero/Cavan Images)").as_deref(),
+        Some("Victoria Harbour, Hongkong, China")
+    );
+    assert_eq!(bing_caption("  ").as_deref(), None);
+    assert_eq!(clean_caption("A\nB\u{7}  C").as_deref(), Some("A B C"));
+    assert_eq!(
+        clean_caption(&"x".repeat(500)).unwrap().chars().count(),
+        120
+    );
+    // Stored captions survive reloads and a same-day metadata update adds a missing one.
+    let fixture = Fixture::new();
+    let directory = fixture.wallpapers();
+    install_bing(&directory, "20261113", Some("Hongkong"), &image(1920, 1080)).unwrap();
+    let mut item = bing_item(&directory).unwrap();
+    assert_eq!(item.caption.as_deref(), Some("Hongkong"));
+    item.caption = Some("Victoria Harbour".into());
+    update_bing_metadata(&directory, &item).unwrap();
+    assert_eq!(
+        bing_item(&directory).unwrap().caption.as_deref(),
+        Some("Victoria Harbour")
+    );
+    assert_eq!(bing_version(&directory).as_deref(), Some("20261113"));
 }

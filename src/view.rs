@@ -266,6 +266,54 @@ impl Scene {
             }
         }
     }
+    /// Moves draws from `from` by (dx, dy); hit targets stay put, so motion never moves a control.
+    fn shift(&mut self, from: usize, dx: f32, dy: f32) {
+        if dx == 0. && dy == 0. {
+            return;
+        }
+        let shift = |rect: &mut Rect| {
+            rect.x += dx;
+            rect.y += dy;
+        };
+        for draw in &mut self.draw[from..] {
+            match draw {
+                Draw::Glass(rect, ..)
+                | Draw::Shape(rect, ..)
+                | Draw::RoundedGradient(rect, ..)
+                | Draw::Shadow(rect, ..)
+                | Draw::Text(_, rect, ..)
+                | Draw::Image(_, rect, ..)
+                | Draw::TintedImage(_, rect, ..)
+                | Draw::AppImage(_, rect, ..)
+                | Draw::Clip(Some(rect)) => shift(rect),
+                Draw::EdgeFade(Some(edges)) => edges.iter_mut().for_each(|y| *y += dy),
+                Draw::EdgeFadeX(Some(edges)) => edges.iter_mut().for_each(|x| *x += dx),
+                Draw::Clip(None) | Draw::EdgeFade(None) | Draw::EdgeFadeX(None) => {}
+            }
+        }
+    }
+
+    /// Liquid Glass entrance: fades in while gliding the last few pixels into place.
+    fn glide(
+        &mut self,
+        from: usize,
+        started: Option<std::time::Instant>,
+        duration: f32,
+        dx: f32,
+        dy: f32,
+    ) {
+        let Some(started) = started else {
+            return;
+        };
+        let t = started.elapsed().as_secs_f32() / duration;
+        if t >= 1. {
+            return;
+        }
+        let eased = crate::state::ease_out(t);
+        self.fade(from, eased, 1.);
+        self.shift(from, dx * (1. - eased), dy * (1. - eased));
+    }
+
     fn fade(&mut self, from: usize, alpha: f32, brightness: f32) {
         for draw in &mut self.draw[from..] {
             let apply = |color: &mut Color| {
@@ -495,6 +543,21 @@ fn c(rgb: u32, alpha: f32) -> Color {
         alpha,
     ]
 }
+/// "From 20:00" in the user's language and clock format.
+fn evening_start_label(state: &State, hour: u8) -> String {
+    let time = OffsetDateTime::UNIX_EPOCH
+        .replace_hour(hour)
+        .unwrap_or(OffsetDateTime::UNIX_EPOCH);
+    let clock = state
+        .preferences
+        .language
+        .clock(time, state.preferences.hour_24, false);
+    state
+        .preferences
+        .language
+        .format("eveningDimFrom", &[("time", &clock)])
+}
+
 fn text(size: f32, weight: u16, tracking: f32) -> TextStyle {
     TextStyle::new(size).weight(weight).tracking(tracking)
 }
@@ -528,6 +591,12 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
             0.,
             false,
         );
+    }
+    // Evening mode: a pure-black scrim folds into the wallpaper, and the renderer applies the
+    // same darkening to the glass backdrop so panels stay consistent with it.
+    let dim = crate::model::evening_dim(state.preferences.evening_dim, now.hour(), now.minute());
+    if dim > 0. {
+        out.shape(Rect::new(0., 0., 1920., 1080.), 0., c(0x000000, dim));
     }
     let content_start = out.draw.len();
     if recents_replaces_page(state) {
@@ -588,11 +657,24 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
         }
         out.control(Target::Retry, retry, false);
     }
+    if let Some(eased) = state.page_transition() {
+        out.fade(content_start, eased, 1.);
+        out.shift(content_start, 0., 28. * (1. - eased));
+    }
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
     header(&mut out, state, assets, now);
     if matches!(state.overlay, Some(Overlay::Inputs | Overlay::Settings)) {
+        let start = out.draw.len();
         corner_menu(&mut out, state, assets);
+        // Drops down from the clock / input pills it belongs to.
+        out.glide(
+            start,
+            state.panel_started,
+            crate::state::POPUP_TRANSITION,
+            0.,
+            -14.,
+        );
     }
     if let Some(
         overlay @ (Overlay::Options { .. }
@@ -648,6 +730,11 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
         ) && let Some(opened) = state.panel_started
         {
             out.fade(start, (opened.elapsed().as_secs_f32() / 0.12).min(1.), 1.);
+            // The dialog rises a little above its dimmed backdrop.
+            let t = opened.elapsed().as_secs_f32() / crate::state::POPUP_TRANSITION;
+            if t < 1. {
+                out.shift(start + 1, 0., 18. * (1. - crate::state::ease_out(t)));
+            }
         }
     }
     if state.recents_open() || state.recents.visibility > 0. {
@@ -1168,7 +1255,12 @@ fn brand_mark(out: &mut Scene, assets: &Assets, app: &App, rect: Rect, language:
     }
 }
 
-fn home(out: &mut Scene, state: &State, assets: &Assets, _now: OffsetDateTime) {
+fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
+    if state.preferences.show_greeting {
+        let start = out.draw.len();
+        greeting(out, state, assets, now);
+        out.fade(start, 1. - state.drawer_progress(), 1.);
+    }
     if state.preferences.show_weather {
         let start = out.draw.len();
         weather_summary(
@@ -1188,6 +1280,56 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, _now: OffsetDateTime) {
         out.controls.truncate(controls);
     }
     favorites_dock(out, state, assets);
+    bing_caption(out, state, assets);
+}
+
+/// Where today's Bing image was taken, small and right-aligned below the dock, only while it
+/// is the background.
+fn bing_caption(out: &mut Scene, state: &State, assets: &Assets) {
+    let Some(caption) = state
+        .wallpapers
+        .iter()
+        .find(|item| {
+            item.id == crate::wallpapers::BING_ID && item.id == state.preferences.background
+        })
+        .and_then(|item| item.caption.as_deref())
+    else {
+        return;
+    };
+    let start = out.draw.len();
+    let style = text(17.6, 500, -0.01).right();
+    let (label, style) = assets.fit_line(caption, style, 1100., 14.);
+    let height = style.size * style.line_height;
+    out.text(
+        label,
+        Rect::new(1836. - 1100., 1022., 1100., height),
+        style,
+        c(0xffffff, 0.62),
+        false,
+    );
+    out.fade(start, 1. - state.drawer_progress(), 1.);
+}
+
+/// Time-of-day greeting between the header pills and the weather widget.
+fn greeting(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
+    let language = state.preferences.language;
+    let greeting = language.greeting(now.hour(), &state.preferences.greeting_name);
+    let base = text(44., 500, -0.04);
+    // Long names in long languages shrink around the same centre rather than wrap or crop.
+    let style = assets.fit_text(&greeting, base, 1500.);
+    let height = style.size * style.line_height;
+    out.text(
+        greeting,
+        Rect::new(
+            84.,
+            136. + (base.size * base.line_height - height) / 2.,
+            1500.,
+            height,
+        ),
+        style,
+        c(0xf5f5f5, 0.92),
+        false,
+    );
 }
 
 fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
@@ -2105,6 +2247,7 @@ fn settings_sidebar(out: &mut Scene, state: &State, assets: &Assets) {
                 Some(Subpage::Language) => language.t("language"),
                 Some(Subpage::AppSorting) => language.t("appSorting"),
                 Some(Subpage::TextRendering) => language.t("textRendering"),
+                Some(Subpage::EveningDim) => language.t("eveningDim"),
                 _ => "",
             };
             let mut path = vec![label];
@@ -2200,109 +2343,136 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
             if let Some(opened) = state.panel_started {
                 out.fade(start, (opened.elapsed().as_secs_f32() / 0.15).min(1.), 1.);
             }
+            out.glide(
+                start,
+                state.panel_started,
+                crate::state::POPUP_TRANSITION,
+                24.,
+                0.,
+            );
             return;
         }
-        let options: Vec<(&str, Option<&str>, bool)> = match subpage {
-            Subpage::DateFormat => crate::model::DateFormat::ALL
-                .iter()
-                .map(|format| {
+        let evening_labels: Vec<String> = crate::model::EVENING_HOURS
+            .iter()
+            .map(|hour| evening_start_label(state, *hour))
+            .collect();
+        let options: Vec<(&str, Option<&str>, bool)> =
+            match subpage {
+                Subpage::DateFormat => crate::model::DateFormat::ALL
+                    .iter()
+                    .map(|format| {
+                        (
+                            format.label(language),
+                            None,
+                            *format == state.preferences.date_format,
+                        )
+                    })
+                    .collect(),
+                Subpage::ClockFormat => vec![
+                    (language.t("hour12"), None, !state.preferences.hour_24),
+                    (language.t("hour24"), None, state.preferences.hour_24),
+                ],
+                Subpage::TimeFormat => vec![
+                    ("HH:MM", None, !state.preferences.show_seconds),
+                    ("HH:MM:SS", None, state.preferences.show_seconds),
+                ],
+                Subpage::InputIcons(id) => {
+                    let current = state.preferences.input_icon(id);
+                    std::iter::once((language.t("inputIconAutomatic"), None, current.is_none()))
+                        .chain(
+                            crate::model::INPUT_ICONS
+                                .iter()
+                                .map(|(icon, key)| (language.t(key), None, current == Some(*icon))),
+                        )
+                        .collect()
+                }
+                Subpage::Input(id) => {
+                    let current = state
+                        .preferences
+                        .input_modes
+                        .get(id)
+                        .copied()
+                        .unwrap_or_default();
+                    vec![
+                        (
+                            language.t("stateOn"),
+                            Some(language.t("inputAlways")),
+                            current == InputMode::On,
+                        ),
+                        (
+                            language.t("stateOff"),
+                            Some(language.t("inputNever")),
+                            current == InputMode::Off,
+                        ),
+                        (
+                            language.t("stateAuto"),
+                            Some(language.t("inputWhenConnected")),
+                            current == InputMode::Auto,
+                        ),
+                    ]
+                }
+                Subpage::Temperature => vec![
                     (
-                        format.label(language),
+                        language.t("celsius"),
                         None,
-                        *format == state.preferences.date_format,
-                    )
-                })
-                .collect(),
-            Subpage::ClockFormat => vec![
-                (language.t("hour12"), None, !state.preferences.hour_24),
-                (language.t("hour24"), None, state.preferences.hour_24),
-            ],
-            Subpage::TimeFormat => vec![
-                ("HH:MM", None, !state.preferences.show_seconds),
-                ("HH:MM:SS", None, state.preferences.show_seconds),
-            ],
-            Subpage::InputIcons(id) => {
-                let current = state.preferences.input_icon(id);
-                std::iter::once((language.t("inputIconAutomatic"), None, current.is_none()))
-                    .chain(
-                        crate::model::INPUT_ICONS
-                            .iter()
-                            .map(|(icon, key)| (language.t(key), None, current == Some(*icon))),
-                    )
-                    .collect()
-            }
-            Subpage::Input(id) => {
-                let current = state
-                    .preferences
-                    .input_modes
-                    .get(id)
-                    .copied()
-                    .unwrap_or_default();
-                vec![
-                    (
-                        language.t("stateOn"),
-                        Some(language.t("inputAlways")),
-                        current == InputMode::On,
+                        state.preferences.temperature_unit == Unit::Celsius,
                     ),
                     (
-                        language.t("stateOff"),
-                        Some(language.t("inputNever")),
-                        current == InputMode::Off,
-                    ),
-                    (
-                        language.t("stateAuto"),
-                        Some(language.t("inputWhenConnected")),
-                        current == InputMode::Auto,
-                    ),
-                ]
-            }
-            Subpage::Temperature => vec![
-                (
-                    language.t("celsius"),
-                    None,
-                    state.preferences.temperature_unit == Unit::Celsius,
-                ),
-                (
-                    language.t("fahrenheit"),
-                    None,
-                    state.preferences.temperature_unit == Unit::Fahrenheit,
-                ),
-            ],
-            Subpage::WeatherLocation
-            | Subpage::Weather
-            | Subpage::WeatherStyle
-            | Subpage::Shortcuts
-            | Subpage::Inputs
-            | Subpage::Greeting
-            | Subpage::Date
-            | Subpage::Clock => {
-                unreachable!()
-            }
-            Subpage::Language => Language::ALL
-                .into_iter()
-                .map(|option| (option.name(), None, option == language))
-                .collect(),
-            Subpage::AppSorting => crate::model::AppSorting::ALL
-                .into_iter()
-                .map(|mode| {
-                    (
-                        language.t(mode.label_key()),
+                        language.t("fahrenheit"),
                         None,
-                        mode == state.preferences.app_sorting,
-                    )
-                })
+                        state.preferences.temperature_unit == Unit::Fahrenheit,
+                    ),
+                ],
+                Subpage::WeatherLocation
+                | Subpage::Weather
+                | Subpage::WeatherStyle
+                | Subpage::Shortcuts
+                | Subpage::Inputs
+                | Subpage::Greeting
+                | Subpage::Date
+                | Subpage::Clock => {
+                    unreachable!()
+                }
+                Subpage::Language => Language::ALL
+                    .into_iter()
+                    .map(|option| (option.name(), None, option == language))
+                    .collect(),
+                Subpage::AppSorting => crate::model::AppSorting::ALL
+                    .into_iter()
+                    .map(|mode| {
+                        (
+                            language.t(mode.label_key()),
+                            None,
+                            mode == state.preferences.app_sorting,
+                        )
+                    })
+                    .collect(),
+                Subpage::EveningDim => std::iter::once((
+                    language.t("stateOff"),
+                    None,
+                    state.preferences.evening_dim.is_none(),
+                ))
+                .chain(crate::model::EVENING_HOURS.iter().zip(&evening_labels).map(
+                    |(hour, label)| {
+                        (
+                            label.as_str(),
+                            None,
+                            state.preferences.evening_dim == Some(*hour),
+                        )
+                    },
+                ))
                 .collect(),
-            Subpage::TextRendering => crate::text_rendering::TextRendering::ALL
-                .into_iter()
-                .map(|mode| {
-                    (
-                        language.t(mode.label_key()),
-                        Some(language.t("textRenderingRestart")),
-                        mode == state.preferences.text_rendering,
-                    )
-                })
-                .collect(),
-        };
+                Subpage::TextRendering => crate::text_rendering::TextRendering::ALL
+                    .into_iter()
+                    .map(|mode| {
+                        (
+                            language.t(mode.label_key()),
+                            Some(language.t("textRenderingRestart")),
+                            mode == state.preferences.text_rendering,
+                        )
+                    })
+                    .collect(),
+            };
         for (index, (title, description, selected)) in options.into_iter().enumerate() {
             let h = if description.is_some() { 90.7 } else { 72. };
             let icon = if matches!(subpage, Subpage::InputIcons(_)) && index > 0 {
@@ -2332,6 +2502,14 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
         if let Some(opened) = state.panel_started {
             out.fade(start, (opened.elapsed().as_secs_f32() / 0.15).min(1.), 1.);
         }
+        // Subpages slide in from the side they open towards.
+        out.glide(
+            start,
+            state.panel_started,
+            crate::state::POPUP_TRANSITION,
+            24.,
+            0.,
+        );
         return;
     }
     match state.section {
@@ -2355,6 +2533,10 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
             out.draw.push(Draw::Clip(None));
         }
         0 => {
+            let evening_value = match state.preferences.evening_dim {
+                Some(hour) => evening_start_label(state, hour),
+                None => language.t("stateOff").to_owned(),
+            };
             for (position, (index, key, icon, value, chevron)) in [
                 (1, "clock", "clock", None, true),
                 (4, "language", "language", Some(language.name()), true),
@@ -2363,6 +2545,13 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                     "appSorting",
                     "arrow-up-down",
                     Some(language.t(state.preferences.app_sorting.label_key())),
+                    true,
+                ),
+                (
+                    11,
+                    "eveningDim",
+                    "weather-moon",
+                    Some(evening_value.as_str()),
                     true,
                 ),
                 (
@@ -2533,6 +2722,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 (1, "weather", "weather-sun"),
                 (2, "shortcuts", "sparkles"),
                 (3, "inputs", "input-hdmi"),
+                (0, "greeting", "type"),
             ]
             .into_iter()
             .enumerate()
@@ -3219,8 +3409,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
     };
     let movable = !shortcut
         && !background
-        && state.managing_apps()
-        && favorite
+        && ((state.managing_apps() && favorite) || state.drawer_movable(id))
         && !state.preferences.hidden.iter().any(|item| item == id);
     let height = if shortcut {
         176.
@@ -3371,6 +3560,13 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
             (opened.elapsed().as_secs_f32() / 0.12).min(1.),
             1.,
         );
+        // The action panel slides out from the lifted card beside it.
+        let t = opened.elapsed().as_secs_f32() / crate::state::POPUP_TRANSITION;
+        if t < 1. {
+            let from_left = anchor.is_none_or(|card| panel.x > card.x);
+            let dx = if from_left { -16. } else { 16. };
+            out.shift(panel_start, dx * (1. - crate::state::ease_out(t)), 0.);
+        }
     }
 }
 
@@ -3912,24 +4108,74 @@ mod tests {
     }
 
     #[test]
-    fn legacy_greetings_are_not_drawn_on_home() {
+    fn greetings_follow_the_time_of_day_and_the_show_on_home_toggle() {
         let assets = assets();
         for name in ["", "Ana"] {
-            let state = State::new(Preferences {
-                greeting_name: name.into(),
-                show_weather: false,
-                ..Preferences::default()
-            });
-            let mut scene = Scene::new();
-            home(&mut scene, &state, &assets, OffsetDateTime::UNIX_EPOCH);
-            let greeting = state.preferences.language.greeting(0, name);
-            assert!(
-                !scene
-                    .draw
-                    .iter()
-                    .any(|draw| matches!(draw, Draw::Text(value, ..) if value == &greeting))
-            );
+            for (hour, key) in [
+                (3, "greetingNight"),
+                (9, "morning"),
+                (14, "afternoon"),
+                (20, "evening"),
+            ] {
+                for show_greeting in [true, false] {
+                    let state = State::new(Preferences {
+                        greeting_name: name.into(),
+                        show_greeting,
+                        show_weather: false,
+                        ..Preferences::default()
+                    });
+                    let now = OffsetDateTime::UNIX_EPOCH.replace_hour(hour).unwrap();
+                    let mut scene = Scene::new();
+                    home(&mut scene, &state, &assets, now);
+                    let greeting = state.preferences.language.greeting(hour, name);
+                    assert!(
+                        greeting
+                            .starts_with(state.preferences.language.t(key).trim_end_matches('.'))
+                            || !name.is_empty()
+                    );
+                    assert_eq!(
+                        scene.draw.iter().any(
+                            |draw| matches!(draw, Draw::Text(value, ..) if value == &greeting)
+                        ),
+                        show_greeting,
+                        "{name}/{hour}/{show_greeting}"
+                    );
+                }
+            }
         }
+    }
+
+    #[test]
+    fn evening_mode_darkens_the_wallpaper_only_in_the_evening() {
+        use crate::model::{EVENING_DIM, evening_dim};
+        assert_eq!(evening_dim(None, 22, 0), 0.);
+        assert_eq!(evening_dim(Some(20), 19, 59), 0.);
+        assert!((evening_dim(Some(20), 20, 15) - EVENING_DIM / 2.).abs() < 1e-6);
+        assert_eq!(evening_dim(Some(20), 21, 0), EVENING_DIM);
+        assert_eq!(evening_dim(Some(20), 2, 0), EVENING_DIM);
+        assert!((evening_dim(Some(20), 5, 45) - EVENING_DIM / 2.).abs() < 1e-6);
+        assert_eq!(evening_dim(Some(20), 6, 0), 0.);
+        assert_eq!(evening_dim(Some(20), 12, 0), 0.);
+        let assets = assets();
+        let state = State::new(Preferences {
+            evening_dim: Some(20),
+            ..Preferences::default()
+        });
+        let dimmed = |hour| {
+            scene(
+                &state,
+                &assets,
+                OffsetDateTime::UNIX_EPOCH.replace_hour(hour).unwrap(),
+            )
+            .draw
+            .iter()
+            .any(|draw| {
+                matches!(draw, Draw::Shape(rect, _, _, color)
+                if rect.w >= 1920. && rect.h >= 1080. && color[..3] == [0., 0., 0.])
+            })
+        };
+        assert!(dimmed(22));
+        assert!(!dimmed(12));
     }
 
     #[test]

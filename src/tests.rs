@@ -467,6 +467,7 @@ fn gallery_and_grid_navigation_scroll_to_keep_focus_visible() {
     state.set_wallpapers(vec![crate::wallpapers::Wallpaper {
         id: "custom-00000000000000000000000000000001".into(),
         version: None,
+        caption: None,
         directory: PathBuf::from("/preview/wallpapers/custom-00000000000000000000000000000001"),
         has_original: true,
     }]);
@@ -2417,17 +2418,22 @@ fn widgets_group_existing_settings_and_restore_each_parent_without_changing_pref
             _ => None,
         })
         .collect();
-    assert_eq!(widget_order, [1, 2, 3]);
-    for (index, subpage) in [Subpage::Weather, Subpage::Shortcuts, Subpage::Inputs]
-        .into_iter()
-        .enumerate()
+    assert_eq!(widget_order, [1, 2, 3, 0]);
+    for (index, subpage) in [
+        Subpage::Greeting,
+        Subpage::Weather,
+        Subpage::Shortcuts,
+        Subpage::Inputs,
+    ]
+    .into_iter()
+    .enumerate()
     {
-        state.focus = Target::Widget(index + 1);
+        state.focus = Target::Widget(index);
         state.direction(Direction::Right, &controls(&state));
         assert_eq!(state.subpage, Some(subpage));
         state.back();
         assert!(state.subpage.is_none());
-        assert_eq!(state.focus, Target::Widget(index + 1));
+        assert_eq!(state.focus, Target::Widget(index));
     }
     state.direction(Direction::Left, &controls(&state));
     assert_eq!(state.focus, Target::Sidebar(WIDGETS_SECTION));
@@ -2494,9 +2500,9 @@ fn widgets_are_localized_without_legacy_sidebar_entries() {
                 .iter()
                 .filter(|c| matches!(c.target, Target::Widget(_)))
                 .count(),
-            3
+            4
         );
-        for key in ["widgets", "weather", "shortcuts", "inputs"] {
+        for key in ["widgets", "greeting", "weather", "shortcuts", "inputs"] {
             assert!(page.draw.iter().any(|draw| matches!(draw, crate::renderer::Draw::Text(label, ..) if label == language.t(key))), "{key}/{language:?}");
         }
         state.pointer_focus(Target::Sidebar(0));
@@ -2558,6 +2564,7 @@ fn settings_lists_keep_bottom_padding_for_remote_and_wheel_scrolling() {
                     .map(|index| crate::wallpapers::Wallpaper {
                         id: format!("custom-{index:032x}"),
                         version: None,
+                        caption: None,
                         directory: std::path::PathBuf::from(".build/padding-fixture"),
                         has_original: true,
                     })
@@ -2872,8 +2879,9 @@ fn greeting_visibility_toggle_persists_without_clearing_name_or_hiding_date() {
     state.activate();
     assert!(state.preferences.show_greeting);
     state.open(0);
+    // Shown again on Home, with the saved name.
     assert!(
-        !scene(&state)
+        scene(&state)
             .draw
             .iter()
             .any(|draw| matches!(draw, Draw::Text(label, ..) if label == &greeting))
@@ -3360,4 +3368,159 @@ fn hovering_corner_controls_keeps_their_geometry_and_does_not_change_pages() {
     assert_eq!(state.page, Page::Home);
     state.hover = None;
     assert_eq!(tab(&state), idle);
+}
+
+#[test]
+fn evening_mode_is_chosen_in_general_settings_and_restores_its_row() {
+    use crate::state::Subpage;
+    let mut state = ready();
+    state.open(2);
+    state.focus = Target::Setting(11);
+    state.activate();
+    assert_eq!(state.subpage, Some(Subpage::EveningDim));
+    assert_eq!(state.focus, Target::Choice(0));
+    let choices = controls(&state)
+        .iter()
+        .filter(|control| matches!(control.target, Target::Choice(_)))
+        .count();
+    assert_eq!(choices, crate::model::EVENING_HOURS.len() + 1);
+    state.focus = Target::Choice(3);
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert_eq!(state.preferences.evening_dim, Some(20));
+    assert_eq!(state.subpage, None);
+    assert_eq!(state.focus, Target::Setting(11));
+    state.activate();
+    assert_eq!(state.focus, Target::Choice(3));
+    state.focus = Target::Choice(0);
+    state.activate();
+    assert_eq!(state.preferences.evening_dim, None);
+    let mut invalid: Preferences = serde_json::from_str(r#"{"evening_dim":3}"#).unwrap();
+    invalid.sanitize();
+    assert_eq!(invalid.evening_dim, None);
+}
+
+#[test]
+fn backfilled_dock_apps_can_be_reordered_too() {
+    let mut state = ready();
+    // Two favorites; the dock backfills four more apps.
+    state.preferences.favorites = Some(vec!["netflix".into(), "youtube.leanback.v4".into()]);
+    let dock: Vec<String> = state.dock_apps().iter().map(|app| app.id.clone()).collect();
+    assert_eq!(dock.len(), 6);
+    let filler = dock[3].clone();
+    state.focus = Target::App(filler.clone());
+    state.hold();
+    assert_eq!(state.moving.as_deref(), Some(filler.as_str()));
+    assert!(state.overlay.is_none());
+    // The visible dock is pinned in its order, so nothing on screen jumps.
+    assert_eq!(state.preferences.favorites.as_deref(), Some(&dock[..]));
+    assert_eq!(
+        state.direction(Direction::Left, &controls(&state)),
+        vec![Effect::Save]
+    );
+    let moved = state.preferences.favorites.clone().unwrap();
+    assert_eq!(moved[2], filler);
+    assert_eq!(moved[3], dock[2]);
+}
+
+#[test]
+fn drawer_apps_move_in_the_grid_and_keep_a_custom_order() {
+    use crate::model::AppSorting;
+    let mut state = ready();
+    state.open(1);
+    state.drawer_visibility = 1.;
+    let before: Vec<String> = state
+        .drawer_apps()
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert!(before.len() > crate::state::APPS_COLUMNS + 1);
+    let id = before[0].clone();
+    state.focus = Target::App(id.clone());
+    state.options();
+    assert!(
+        controls(&state)
+            .iter()
+            .any(|control| control.target == Target::MoveApp)
+    );
+    state.focus = Target::MoveApp;
+    assert!(state.activate().is_empty());
+    assert!(state.overlay.is_none());
+    assert_eq!(state.moving.as_deref(), Some(id.as_str()));
+    // Right swaps with the neighbour; Down moves one row (six columns) further.
+    assert_eq!(
+        state.direction(Direction::Right, &controls(&state)),
+        vec![Effect::Save]
+    );
+    assert_eq!(state.preferences.app_sorting, AppSorting::Custom);
+    let order: Vec<String> = state
+        .drawer_apps()
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert_eq!(order[1], id);
+    assert_eq!(order[0], before[1]);
+    state.direction(Direction::Down, &controls(&state));
+    let order: Vec<String> = state
+        .drawer_apps()
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert_eq!(order[1 + crate::state::APPS_COLUMNS], id);
+    // Up from the first row and moves past the end are ignored.
+    state.direction(Direction::Up, &controls(&state));
+    state.direction(Direction::Up, &controls(&state));
+    assert!(state.direction(Direction::Up, &controls(&state)).is_empty());
+    assert_eq!(state.focus, Target::App(id.clone()));
+    assert!(state.back().is_empty());
+    assert!(state.moving.is_none());
+    // The order survives a reload.
+    let saved = serde_json::to_string(&state.preferences).unwrap();
+    let mut restored = State::new(serde_json::from_str(&saved).unwrap());
+    restored.set_inventory(demo_inventory(), None);
+    let reloaded: Vec<String> = restored
+        .drawer_apps()
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert_eq!(
+        reloaded,
+        state
+            .drawer_apps()
+            .iter()
+            .map(|app| app.id.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn settings_glides_in_without_moving_hit_targets_unless_motion_is_reduced() {
+    use crate::renderer::Draw;
+    let mut state = ready();
+    state.open(2);
+    let settled = scene(&state);
+    state.page_started = Some(std::time::Instant::now());
+    assert!(state.animating());
+    let gliding = scene(&state);
+    assert_eq!(
+        settled
+            .controls
+            .iter()
+            .map(|c| c.rect.y)
+            .collect::<Vec<_>>(),
+        gliding
+            .controls
+            .iter()
+            .map(|c| c.rect.y)
+            .collect::<Vec<_>>()
+    );
+    let first_text = |scene: &crate::view::Scene| {
+        scene.draw.iter().find_map(|draw| match draw {
+            Draw::Text(label, rect, ..) if label == "General" => Some(rect.y),
+            _ => None,
+        })
+    };
+    assert!(first_text(&gliding).unwrap() > first_text(&settled).unwrap());
+    state.preferences.reduced_motion = true;
+    assert!(state.page_transition().is_none());
+    assert_eq!(first_text(&scene(&state)), first_text(&settled));
 }

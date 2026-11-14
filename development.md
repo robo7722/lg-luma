@@ -172,8 +172,9 @@ with a tighter 48-pixel spacing for Languages and Backgrounds.
 The Home greeting and standalone date, along with their widget entries, are removed. Their legacy
 preferences remain readable and are not erased during other edits. Weather occupies the former
 greeting area with a large condition icon, temperature, condition and location. The colored, static
-icons are original Breezy Weather PNGs, including clear/partly-cloudy night variants, bundled locally
-with their LGPL-3.0 license, attribution and source hashes in `assets/weather/`. No icons are fetched at runtime.
+icons are original MIT artwork in a flat style, including clear/partly-cloudy night variants and
+distinct drizzle and rain. `assets/weather/` holds the SVG sources; `node tools/weather-icons.mjs`
+renders the bundled 256 px PNGs and pins their hashes. No icons are fetched at runtime.
 Disabled weather
 is hidden. Enabled weather without a location uses the same large 144px artwork and a prominent setup action.
 Settings lists render behind fixed controls. The drawer grid is clipped below its fixed dock so
@@ -360,6 +361,14 @@ updates, and normal/takeover launches using the shared preferences location use 
 Custom images are not used as LG's launch splash: runtime splash updates are skipped for them,
 and takeover boot staging uses a bundled fallback.
 
+### Liquid Glass motion
+
+Entering or leaving Settings glides the page 28 px up while it fades in (0.32 s, cubic ease-out);
+the event loop starts it when the page changes, so unit-test scenes stay static. The clock/input
+menus drop 14 px, dialogs rise 18 px, option panels slide 16 px from their card and subpages slide
+24 px, over 0.2 s. Only drawn geometry moves; hit targets stay at their final rects. Reduce motion
+disables all of it.
+
 ### Bing image of the day
 
 The `luma-bing` worker, started with the wallpaper service and stopped when it is dropped, keeps a
@@ -373,7 +382,10 @@ upload pipeline (shading, original, thumbnail) after a mild 3×3 unsharp mask th
 TV scaling the 1080p UI plane to 4K panels. Files are versioned (`wallpaper-<startdate>.jpg`)
 because textures are cached by path. New files are written in a dot-prefixed staging directory,
 moved into `wallpapers/bing-daily/`, and committed by atomically renaming `metadata.json`; the
-previous day's files remain until the next update. Scripted runs, simulated update previews and
+previous day's files remain until the next update. The place from Bing's `copyright` line (without the
+bracketed photo credit) is stored as a bounded, single-line `caption`; a same-day reply with a
+different caption only rewrites `metadata.json`. Home shows it right-aligned below the dock while
+the Bing tile is the background. Scripted runs, simulated update previews and
 tests never start the worker. Like uploads, it is not used as LG's launch splash.
 
 The fixed actions are **Upload**, **Gradient**, and **Rotation**, from left to right.

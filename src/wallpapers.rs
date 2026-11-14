@@ -43,6 +43,9 @@ pub struct Wallpaper {
     /// Daily images change file names, because the renderer caches textures by path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// Where a daily image was taken ("Victoria Harbour, Hongkong, China"), shown on Home.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caption: Option<String>,
     #[serde(skip)]
     pub directory: PathBuf,
     #[serde(skip)]
@@ -240,6 +243,7 @@ fn catalog(directory: &Path) -> Vec<Wallpaper> {
             continue;
         }
         item.directory = path;
+        item.caption = item.caption.as_deref().and_then(clean_caption);
         let usable = |file: PathBuf| {
             fs::symlink_metadata(file)
                 .is_ok_and(|m| m.is_file() && m.len() > 0 && m.len() <= MAX_BODY as u64)
@@ -502,6 +506,7 @@ fn store(directory: &Path, bytes: &[u8], valid: impl Fn() -> bool) -> Result<Wal
     let item = Wallpaper {
         id: id.clone(),
         version: None,
+        caption: None,
         directory: directory.join(&id),
         has_original: true,
     };
@@ -649,10 +654,37 @@ struct BingArchive {
 struct BingImage {
     startdate: String,
     urlbase: String,
+    #[serde(default)]
+    copyright: String,
 }
 
-/// Returns the image version (`startdate`) and its fixed-origin 1920×1080 URL.
-fn parse_bing(bytes: &[u8]) -> Result<(String, String), String> {
+#[derive(Debug, PartialEq)]
+struct BingRelease {
+    version: String,
+    url: String,
+    caption: Option<String>,
+}
+
+/// Single-line, bounded display text from Bing or stored metadata; None when empty.
+fn clean_caption(text: &str) -> Option<String> {
+    let text: String = text
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let text: String = text.chars().take(120).collect();
+    (!text.is_empty()).then_some(text)
+}
+
+/// The place from Bing's copyright line, without the photo credit in brackets.
+fn bing_caption(copyright: &str) -> Option<String> {
+    clean_caption(copyright.split(" (©").next().unwrap_or_default())
+}
+
+/// The image version (`startdate`), its fixed-origin 1920×1080 URL and the location caption.
+fn parse_bing(bytes: &[u8]) -> Result<BingRelease, String> {
     let archive: BingArchive =
         serde_json::from_slice(bytes).map_err(|_| "Bing returned unreadable data")?;
     let image = archive
@@ -673,17 +705,40 @@ fn parse_bing(bytes: &[u8]) -> Result<(String, String), String> {
     {
         return Err("Bing returned an invalid image address".into());
     }
-    Ok((
-        image.startdate,
-        format!("{BING_ORIGIN}{base}_1920x1080.jpg"),
-    ))
+    Ok(BingRelease {
+        url: format!("{BING_ORIGIN}{base}_1920x1080.jpg"),
+        version: image.startdate,
+        caption: bing_caption(&image.copyright),
+    })
 }
 
-fn bing_version(directory: &Path) -> Option<String> {
+fn bing_item(directory: &Path) -> Option<Wallpaper> {
     catalog(directory)
         .into_iter()
         .find(|item| item.id == BING_ID)
-        .and_then(|item| item.version)
+}
+
+fn bing_version(directory: &Path) -> Option<String> {
+    bing_item(directory).and_then(|item| item.version)
+}
+
+/// Replaces only the metadata of the current image, atomically, e.g. to add a caption that
+/// an earlier release did not store.
+fn update_bing_metadata(directory: &Path, item: &Wallpaper) -> Result<(), String> {
+    let target = directory.join(BING_ID);
+    if !real_directory(&target) {
+        return Err("Invalid Bing wallpaper directory".into());
+    }
+    let temporary = target.join(".metadata.json");
+    let _ = fs::remove_file(&temporary);
+    write_new(
+        &temporary,
+        &serde_json::to_vec(item).map_err(|e| e.to_string())?,
+    )?;
+    fs::rename(&temporary, target.join("metadata.json")).map_err(|e| {
+        let _ = fs::remove_file(&temporary);
+        e.to_string()
+    })
 }
 
 fn remove_staging(staging: &Path) {
@@ -698,7 +753,12 @@ fn remove_staging(staging: &Path) {
 /// Writes a new daily version next to the current one, then switches `metadata.json`
 /// with an atomic rename. The previous version stays until the next update, so a
 /// background that is still drawn from the old path never disappears underneath it.
-fn install_bing(directory: &Path, version: &str, bytes: &[u8]) -> Result<(), String> {
+fn install_bing(
+    directory: &Path,
+    version: &str,
+    caption: Option<&str>,
+    bytes: &[u8],
+) -> Result<(), String> {
     if !valid_version(version) {
         return Err("Invalid Bing image date".into());
     }
@@ -717,6 +777,7 @@ fn install_bing(directory: &Path, version: &str, bytes: &[u8]) -> Result<(), Str
     let item = Wallpaper {
         id: BING_ID.into(),
         version: Some(version.into()),
+        caption: caption.and_then(clean_caption),
         directory: staging.clone(),
         has_original: true,
     };
@@ -792,12 +853,24 @@ fn bing_get(agent: &ureq::Agent, url: &str, accept: &str) -> Result<Vec<u8>, Str
 
 /// Returns true when a new daily image was installed.
 fn refresh_bing(agent: &ureq::Agent, directory: &Path) -> Result<bool, String> {
-    let (version, url) = parse_bing(&bing_get(agent, BING_ARCHIVE, "application/json")?)?;
-    if bing_version(directory).as_deref() == Some(version.as_str()) {
-        return Ok(false);
+    let release = parse_bing(&bing_get(agent, BING_ARCHIVE, "application/json")?)?;
+    if let Some(mut current) = bing_item(directory)
+        && current.version.as_deref() == Some(release.version.as_str())
+    {
+        if current.caption == release.caption {
+            return Ok(false);
+        }
+        current.caption = release.caption;
+        update_bing_metadata(directory, &current)?;
+        return Ok(true);
     }
-    let bytes = bing_get(agent, &url, "image/jpeg")?;
-    install_bing(directory, &version, &bytes)?;
+    let bytes = bing_get(agent, &release.url, "image/jpeg")?;
+    install_bing(
+        directory,
+        &release.version,
+        release.caption.as_deref(),
+        &bytes,
+    )?;
     Ok(true)
 }
 

@@ -34,7 +34,9 @@ Home uses Liquid Glass controls over your wallpaper, a floating favorites dock, 
 block with a condition icon, temperature, condition, and location. The greeting and standalone
 date have been removed.
 
-- **Left / Right** browses favorites. Hold **OK** to reorder them.
+- **Left / Right** browses favorites. Hold **OK** to reorder any card in the dock.
+- In the app drawer below the dock, hold **OK** on an app and choose **Move**, then use the arrows
+  to place it. The drawer then keeps this **Custom order** (Settings → General → App sorting).
 - **Down** from favorites opens the animated six-column app drawer.
 - **Up** from favorites reaches the corner controls.
 - **Back** closes the drawer and focuses the first favorite.
@@ -157,7 +159,7 @@ to help make Luma available by default.
 On your computer, replace `TV_IP`:
 
 ```sh
-scp -O dist/com.ecklf.luma_3.2.1_arm.ipk root@TV_IP:/tmp/luma.ipk
+scp -O dist/com.ecklf.luma_3.3.0_arm.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -277,6 +279,14 @@ Choose the interface language in **Settings → General → Language**. Luma sup
 Czech, Dutch, English, French, German, Italian, Polish, Portuguese (Brazil), Russian,
 Simplified Chinese, Spanish, Swedish, Traditional Chinese and Vietnamese.
 
+### Greeting and evening mode
+
+Home greets you by time of day ("Good evening"), optionally with your name. Turn it off or set the
+name in **Settings → Widgets → Greeting**.
+
+**Settings → General → Evening mode** dims the background and glass surfaces from a chosen hour
+(18:00–22:00) until 06:00, fading in and out over 30 minutes.
+
 ### Backgrounds
 
 Open **Settings → Background → Upload**, then scan the QR code or open the shown
@@ -286,7 +296,8 @@ its 16:9 crop before choosing **Save to TV**.
 The upload link works only while its TV dialog is open and focused.
 
 A **Bing** tile with Microsoft Bing's image of the day appears in the gallery once Luma has
-downloaded it. Select it for a background that changes daily. It does not use one of the 20 upload
+downloaded it. Select it for a background that changes daily; Home then shows where the photo was taken, small
+below the dock. It does not use one of the 20 upload
 slots and cannot be deleted.
 
 Enable **Rotation** beside **Upload** to cycle through backgrounds on each Luma restart and every
@@ -344,7 +355,7 @@ checksum-pinned SDL-webOS library; both downloads are cached under `.build/`.
 Output:
 
 ```text
-dist/com.ecklf.luma_3.2.1_arm.ipk
+dist/com.ecklf.luma_3.3.0_arm.ipk
 dist/sha256sums
 dist/repo.json
 dist/app-icon-large.png
@@ -386,6 +397,5 @@ See [Releases](development.md#releases) for the workflow and repository setup.
 
 ## License
 
-Luma's code is licensed under MIT. Bundled [Breezy Weather icons](assets/weather/README.md)
-are separately licensed under LGPL-3.0.\
+Luma's code and its bundled [weather icons](assets/weather/README.md) are licensed under MIT.\
 Luma is not affiliated with LG, Apple, or any other brands shown in its UI.

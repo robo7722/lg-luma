@@ -8,6 +8,7 @@ uniform bool u_app;
 uniform sampler2D u_glass_a;
 uniform sampler2D u_glass_b;
 uniform float u_glass_mix;
+uniform float u_glass_dim;
 uniform bool u_glass_enabled;
 varying PAINT_PRECISION vec2 v_uv;
 varying PAINT_PRECISION vec4 v_color;
@@ -66,18 +67,23 @@ void main() {
             float rim = 1.0 - smoothstep(0.0, bevel, depth);
             // Bounded curved-lens profile, not a wide painted bevel.
             float slope = rim * rim;
-            vec2 uv = (vec2(v_logical_x, v_logical_y) - normal * slope * 9.0) / vec2(1920.0, 1080.0);
+            // Liquid Glass: a stronger curved-lens refraction near the rim.
+            vec2 uv = (vec2(v_logical_x, v_logical_y) - normal * slope * 14.0) / vec2(1920.0, 1080.0);
             float scattering = mix(0.25, 0.88, smoothstep(0.0, bevel * 2.0, depth));
-            vec3 backdrop = glass_sample(uv, scattering);
+            vec3 backdrop = glass_sample(uv, scattering) * u_glass_dim;
             float luminance = dot(backdrop, vec3(0.2126, 0.7152, 0.0722));
             float focused = step(0.5, v_color.r);
             // Neutral adaptive absorption keeps white labels legible on bright imagery.
-            color = mix(backdrop, vec3(0.075), 0.14 + 0.44 * luminance);
+            color = mix(backdrop, vec3(0.075), 0.11 + 0.42 * luminance);
             color = mix(color, v_color.rgb, focused * 0.88);
             float light = dot(normal, normalize(vec2(-0.55, -1.0)));
             float specular = pow(abs(light), 5.0);
             float hairline = 1.0 - smoothstep(0.0, 1.25, depth);
-            color += vec3(hairline * (0.07 + specular * 0.24) + slope * specular * 0.045);
+            color += vec3(hairline * (0.09 + specular * 0.34) + slope * specular * 0.07);
+            // Light caught inside the rim, and a soft sheen across the upper part of the surface.
+            color += vec3(rim * 0.05);
+            float top = clamp(-v_shape.y / max(half_size.y, 1.0), 0.0, 1.0);
+            color += vec3(0.08 * top * top * (1.0 - focused));
         }
         gl_FragColor = vec4(color, alpha * v_color.a * edge_coverage());
         return;

@@ -30,7 +30,7 @@ impl Brand {
             "hbo-max" | "bbc-iplayer" | "crunchyroll" | "twitch" | "dazn" | "paramount-plus"
             | "channel-4" | "wavve" => (0.70, 64.),
             "now-tv" => (0.70, 52.),
-            "live-tv" | "browser" => (0.62, 68.),
+            "live-tv" | "browser" | "zattoo" => (0.62, 68.),
             _ => (0.70, 56.),
         }
     }
@@ -79,7 +79,8 @@ pub const BRANDS: &[Brand] = &[
         "Spotify",
         &["spotify-beehive", "com.spotify.tv.webos"],
     ),
-    video("plex", "Plex", &["cdp-30", "plex"]),
+    // PlxNative (github.com/GLinnik21/plx-native) is a native Plex client.
+    video("plex", "Plex", &["cdp-30", "plex", "com.beb.plxnative"]),
     video(
         "hbo-max",
         "HBO Max",

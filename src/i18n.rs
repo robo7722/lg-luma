@@ -117,7 +117,6 @@ impl Language {
         }
         value
     }
-    #[cfg(test)]
     pub fn greeting(self, hour: u8, name: &str) -> String {
         let key = match hour {
             0..=4 => "greetingNight",

@@ -32,6 +32,14 @@ pub const HOME_TILE_PITCH: f32 = 296.4;
 pub const HOME_FADE_LEFT: f32 = 60.;
 pub const HOME_FADE_RIGHT: f32 = 1860.;
 pub const BACKGROUND_FADE: f32 = 0.4;
+/// Seconds for the Liquid Glass page glide and popup bloom.
+pub const PAGE_TRANSITION: f32 = 0.32;
+pub const POPUP_TRANSITION: f32 = 0.2;
+
+/// Cubic ease-out: quick start, soft landing, like a glass sheet settling.
+pub fn ease_out(t: f32) -> f32 {
+    1. - (1. - t.clamp(0., 1.)).powi(3)
+}
 pub const CYCLE_FADE: f32 = 1.6;
 
 pub fn unix_now() -> u64 {
@@ -173,6 +181,7 @@ pub enum Subpage {
     Language,
     AppSorting,
     TextRendering,
+    EveningDim,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -262,6 +271,8 @@ pub struct State {
     /// Luma update (Settings → System), driven by the update worker.
     pub update: crate::update::InstallStatus,
     pub panel_started: Option<Instant>,
+    /// Start of the glide between Home/Apps and Settings, set by the event loop.
+    pub page_started: Option<Instant>,
     pub weather: weather::Weather,
     pub keyboard_field: TextField,
     pub greeting_name_draft: String,
@@ -310,6 +321,7 @@ impl State {
             tile_editor: None,
             update: crate::update::InstallStatus::default(),
             panel_started: None,
+            page_started: None,
             weather: weather::Weather::default(),
             keyboard_field: TextField::Apps,
             greeting_name_draft: String::new(),
@@ -513,8 +525,18 @@ impl State {
         }
     }
 
+    /// Eased progress (0 → 1) of the page glide, while it runs.
+    pub fn page_transition(&self) -> Option<f32> {
+        let started = self
+            .page_started
+            .filter(|_| !self.preferences.reduced_motion)?;
+        let t = started.elapsed().as_secs_f32() / PAGE_TRANSITION;
+        (t < 1.).then(|| ease_out(t))
+    }
+
     pub fn animating(&self) -> bool {
-        (self.drawer_visibility != if self.page == Page::Apps { 1. } else { 0. })
+        self.page_transition().is_some()
+            || (self.drawer_visibility != if self.page == Page::Apps { 1. } else { 0. })
             || (!self.preferences.reduced_motion
                 && self.input_status_visibility.iter().any(|(id, value)| {
                     *value != if self.input_status_active(id) { 1. } else { 0. }
@@ -631,8 +653,13 @@ impl State {
                     && (!drawer || !dock.iter().any(|pinned| pinned.id == app.id))
             })
             .collect();
+        // A manual drawer order is shown exactly as arranged, without favorites first.
+        let manual = drawer && self.preferences.app_sorting == crate::model::AppSorting::Custom;
         apps.sort_by(|a, b| {
             let rank = |app: &App| {
+                if manual {
+                    return 0;
+                }
                 ids.iter()
                     .position(|id| id == &app.id)
                     .unwrap_or(usize::MAX)
@@ -642,6 +669,45 @@ impl State {
                 .then_with(|| self.preferences.compare_apps(a, b))
         });
         apps
+    }
+
+    /// Whether an app in the drawer below the dock can be moved to a manual position.
+    pub fn drawer_movable(&self, id: &str) -> bool {
+        self.page == Page::Apps && self.drawer_apps().iter().any(|app| app.id == id)
+    }
+
+    /// Moves `id` within the drawer's six-column grid and switches to the manual order.
+    fn move_in_drawer(&mut self, id: &str, direction: Direction) -> Vec<Effect> {
+        let mut order: Vec<String> = self
+            .drawer_apps()
+            .iter()
+            .map(|app| app.id.clone())
+            .collect();
+        let Some(index) = order.iter().position(|item| item == id) else {
+            return vec![];
+        };
+        let next = match direction {
+            Direction::Left => index.checked_sub(1),
+            Direction::Right => Some(index + 1),
+            Direction::Up => index.checked_sub(APPS_COLUMNS),
+            Direction::Down => Some(index + APPS_COLUMNS),
+        }
+        .filter(|next| *next < order.len());
+        let Some(next) = next else {
+            return vec![];
+        };
+        let item = order.remove(index);
+        order.insert(next, item);
+        // Apps not in the drawer right now (dock, hidden) keep their earlier relative place.
+        for previous in &self.preferences.app_order {
+            if !order.contains(previous) {
+                order.push(previous.clone());
+            }
+        }
+        self.preferences.app_sorting = crate::model::AppSorting::Custom;
+        self.preferences.app_order = order;
+        self.dirty = true;
+        vec![Effect::Save]
     }
 
     pub fn favorite_apps(&self) -> Vec<&App> {
@@ -1275,6 +1341,7 @@ impl State {
             Some(Subpage::Language) => Target::Setting(4),
             Some(Subpage::TextRendering) => Target::Setting(7),
             Some(Subpage::AppSorting) => Target::Setting(10),
+            Some(Subpage::EveningDim) => Target::Setting(11),
             None => Target::Sidebar(self.section),
         };
         self.scroll = 0.;
@@ -1317,6 +1384,13 @@ impl State {
             Some(Overlay::WallpaperUpload | Overlay::TileEditor)
         ) {
             return vec![];
+        }
+        if let Some(id) = self.moving.clone()
+            && self.page == Page::Apps
+        {
+            let effects = self.move_in_drawer(&id, direction);
+            self.reveal_focus(controls);
+            return effects;
         }
         if let Some(id) = self.moving.clone() {
             let mut ids = self.preferences.favorites(&self.inventory.apps);
@@ -1536,10 +1610,11 @@ impl State {
                         Subpage::ClockFormat
                         | Subpage::TimeFormat
                         | Subpage::Temperature
-                        | Subpage::TextRendering
-                        | Subpage::AppSorting,
+                        | Subpage::TextRendering,
                     ) => 2,
+                    Some(Subpage::AppSorting) => crate::model::AppSorting::ALL.len(),
                     Some(Subpage::InputIcons(_)) => crate::model::INPUT_ICONS.len() + 1,
+                    Some(Subpage::EveningDim) => crate::model::EVENING_HOURS.len() + 1,
                     Some(Subpage::Language) => Language::ALL.len(),
                     Some(Subpage::DateFormat) => crate::model::DateFormat::ALL.len(),
                     _ => 3,
@@ -2062,12 +2137,21 @@ impl State {
 
     pub fn hold(&mut self) {
         if self.page == Page::Home && self.overlay.is_none() {
+            let dock: Vec<String> = self.dock_apps().iter().map(|app| app.id.clone()).collect();
             if let Target::App(id) = &self.focus
-                && self
-                    .preferences
-                    .favorites(&self.inventory.apps)
-                    .contains(id)
+                && dock.contains(id)
             {
+                // Fewer than six favorites are backfilled with other apps. Holding one of those
+                // pins the visible dock in its current order, so every card can be reordered.
+                let mut favorites = self.preferences.favorites(&self.inventory.apps);
+                if !favorites.contains(id) {
+                    for app in dock {
+                        if !favorites.contains(&app) {
+                            favorites.push(app);
+                        }
+                    }
+                    self.preferences.favorites = Some(favorites);
+                }
                 self.moving = Some(id.clone());
                 self.notice = None;
                 self.dirty = true;
@@ -2360,6 +2444,9 @@ impl State {
             Target::Nav(index) => self.open(if index == 2 { 0 } else { index }),
             Target::InputsMenu => {
                 self.overlay = Some(Overlay::Inputs);
+                if !self.preferences.reduced_motion {
+                    self.panel_started = Some(Instant::now());
+                }
                 self.focus = self
                     .inventory
                     .inputs
@@ -2370,6 +2457,9 @@ impl State {
             Target::SettingsMenu => {
                 self.overlay = Some(Overlay::Settings);
                 self.focus = Target::LumaSettings;
+                if !self.preferences.reduced_motion {
+                    self.panel_started = Some(Instant::now());
+                }
             }
             Target::LumaSettings => {
                 self.open(2);
@@ -2619,9 +2709,12 @@ impl State {
                 match index {
                     10 => {
                         self.subpage = Some(Subpage::AppSorting);
-                        self.focus = Target::Choice(usize::from(
-                            self.preferences.app_sorting == crate::model::AppSorting::Usage,
-                        ));
+                        self.focus = Target::Choice(
+                            crate::model::AppSorting::ALL
+                                .iter()
+                                .position(|mode| *mode == self.preferences.app_sorting)
+                                .unwrap_or(0),
+                        );
                         self.scroll = 0.;
                         if !self.preferences.reduced_motion {
                             self.panel_started = Some(Instant::now());
@@ -2649,6 +2742,25 @@ impl State {
                     5 => return vec![Effect::Quit],
                     9 => {
                         self.reset_icon_cache = true;
+                        return vec![];
+                    }
+                    11 => {
+                        self.subpage = Some(Subpage::EveningDim);
+                        // Choice 0 is Off, then one choice per start hour.
+                        self.focus = Target::Choice(
+                            self.preferences
+                                .evening_dim
+                                .and_then(|hour| {
+                                    crate::model::EVENING_HOURS
+                                        .iter()
+                                        .position(|known| *known == hour)
+                                })
+                                .map_or(0, |index| index + 1),
+                        );
+                        self.scroll = 0.;
+                        if !self.preferences.reduced_motion {
+                            self.panel_started = Some(Instant::now());
+                        }
                         return vec![];
                     }
                     7 => {
@@ -2737,7 +2849,8 @@ impl State {
                             crate::model::WeatherStyle::ALL[index.min(2)];
                     }
                     Some(Subpage::AppSorting) => {
-                        self.preferences.app_sorting = crate::model::AppSorting::ALL[index.min(1)];
+                        self.preferences.app_sorting = crate::model::AppSorting::ALL
+                            [index.min(crate::model::AppSorting::ALL.len() - 1)];
                     }
                     Some(Subpage::ClockFormat) => self.preferences.hour_24 = index == 1,
                     Some(Subpage::TimeFormat) => self.preferences.show_seconds = index == 1,
@@ -2774,6 +2887,11 @@ impl State {
                             Language::ALL[index.min(Language::ALL.len() - 1)];
                         self.weather.cancel_search();
                     }
+                    Some(Subpage::EveningDim) => {
+                        self.preferences.evening_dim = index
+                            .checked_sub(1)
+                            .and_then(|index| crate::model::EVENING_HOURS.get(index).copied());
+                    }
                     Some(Subpage::TextRendering) => {
                         let mode = TextRendering::ALL[index.min(TextRendering::ALL.len() - 1)];
                         if mode != self.preferences.text_rendering {
@@ -2798,6 +2916,19 @@ impl State {
                 return vec![Effect::Save];
             }
             Target::MoveApp => {
+                if let Some(Overlay::Options { id, .. }) = &self.overlay
+                    && self.drawer_movable(id)
+                {
+                    let id = id.clone();
+                    self.overlay = None;
+                    self.panel_started = None;
+                    self.focus = Target::App(id.clone());
+                    self.moving = Some(id);
+                    self.notice = None;
+                    self.pointer = false;
+                    self.pressed = None;
+                    return vec![];
+                }
                 if let Some(Overlay::Options { id, .. }) = &self.overlay
                     && self.managing_apps()
                     && self.favorite_apps().iter().any(|app| &app.id == id)

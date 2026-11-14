@@ -109,11 +109,6 @@ export const sources = [
     '1013fbb5274899a386f57b34413165b9a66933a1614855c5acaa2553a942be97',
   ],
   [
-    'zattoo',
-    commons('Logo_Zattoo.svg'),
-    '2df3c7eaf5e953f2aef43353c622f6c6c06688a9649995b88effb2d1fc0fce5d',
-  ],
-  [
     'skyshowtime',
     commons('SkyShowtime_Logo.svg'),
     'da31ab32038e050cb759335057243054034556117552fa88d4e14457503daa92',
