@@ -1,5 +1,13 @@
 # lg-luma
 
+## 3.5.0
+
+### Minor Changes
+
+- Add short click sounds for remote navigation: a tick when focus moves, a double tick for OK, a falling double tick for Back and a soft bump at the end of a list. Settings → General → Sounds turns them off.
+- Liquid motion: Settings pages, sections and subpages now flow in row by row from top to bottom and spring gently into place instead of moving as one sheet.
+- A faint glass shimmer plays under the Settings section-change animation.
+
 ## 3.4.1
 
 ### Patch Changes

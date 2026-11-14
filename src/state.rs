@@ -33,13 +33,20 @@ pub const HOME_FADE_LEFT: f32 = 60.;
 pub const HOME_FADE_RIGHT: f32 = 1860.;
 pub const BACKGROUND_FADE: f32 = 0.4;
 /// Seconds for the Liquid Glass page glide and popup bloom.
-pub const PAGE_TRANSITION: f32 = 0.45;
-pub const POPUP_TRANSITION: f32 = 0.28;
-pub const SECTION_TRANSITION: f32 = 0.34;
+pub const PAGE_TRANSITION: f32 = 0.56;
+pub const POPUP_TRANSITION: f32 = 0.34;
+pub const SECTION_TRANSITION: f32 = 0.42;
 
 /// Cubic ease-out: quick start, soft landing, like a glass sheet settling.
 pub fn ease_out(t: f32) -> f32 {
     1. - (1. - t.clamp(0., 1.)).powi(3)
+}
+
+/// Liquid spring: eases out, travels about 4 % past its target and settles back at 1.
+pub fn spring(t: f32) -> f32 {
+    let u = t.clamp(0., 1.) - 1.;
+    let overshoot = 1.15;
+    1. + (overshoot + 1.) * u * u * u + overshoot * u * u
 }
 pub const CYCLE_FADE: f32 = 1.6;
 
@@ -276,6 +283,8 @@ pub struct State {
     pub panel_started: Option<Instant>,
     /// Start of the glide between Home/Apps and Settings, set by the event loop.
     pub page_started: Option<Instant>,
+    /// UI click cues to play this frame, drained by the event loop.
+    pub cues: Vec<crate::audio::Cue>,
     /// Start of the glide between Settings sections, set by the event loop.
     pub section_started: Option<Instant>,
     pub weather: weather::Weather,
@@ -327,6 +336,7 @@ impl State {
             update: crate::update::InstallStatus::default(),
             panel_started: None,
             page_started: None,
+            cues: Vec::new(),
             section_started: None,
             weather: weather::Weather::default(),
             keyboard_field: TextField::Apps,
@@ -550,6 +560,13 @@ impl State {
             .filter(|_| !self.preferences.reduced_motion)?;
         let t = started.elapsed().as_secs_f32() / PAGE_TRANSITION;
         (t < 1.).then(|| ease_out(t))
+    }
+
+    /// Start of a running page glide, unless motion is reduced.
+    pub fn page_glide(&self) -> Option<Instant> {
+        self.page_started.filter(|started| {
+            !self.preferences.reduced_motion && started.elapsed().as_secs_f32() < PAGE_TRANSITION
+        })
     }
 
     /// Start of a running Settings section glide, unless motion is reduced.
@@ -2208,6 +2225,63 @@ impl State {
     }
 
     /// Holding OK opens a card's menu everywhere; its Move action starts reordering.
+    fn cue(&mut self, cue: crate::audio::Cue) {
+        if self.preferences.ui_sounds {
+            self.cues.push(cue);
+        }
+    }
+
+    /// Remote arrow keys: `direction` plus a Focus click when anything moved, or a Bump when
+    /// the key reached an edge. Pointer hover never calls this.
+    pub fn navigate(&mut self, direction: Direction, controls: &[Control]) -> Vec<Effect> {
+        let before = (
+            self.focus.clone(),
+            self.scroll,
+            self.home_scroll,
+            self.page,
+            self.section,
+            self.subpage.clone(),
+            self.overlay.is_some(),
+            self.recents_open(),
+        );
+        let effects = self.direction(direction, controls);
+        let after = (
+            self.focus.clone(),
+            self.scroll,
+            self.home_scroll,
+            self.page,
+            self.section,
+            self.subpage.clone(),
+            self.overlay.is_some(),
+            self.recents_open(),
+        );
+        self.cue(if before != after || !effects.is_empty() {
+            crate::audio::Cue::Focus
+        } else {
+            crate::audio::Cue::Bump
+        });
+        effects
+    }
+
+    /// A faint shimmer under the Settings section glide, unless sounds or motion are off.
+    pub fn section_cue(&mut self) {
+        if !self.preferences.reduced_motion {
+            self.cue(crate::audio::Cue::Glide);
+        }
+    }
+
+    /// OK / Enter (or a pointer click) on the focused target.
+    pub fn confirm(&mut self) -> Vec<Effect> {
+        self.cue(crate::audio::Cue::Select);
+        self.activate()
+    }
+
+    /// The Back key, or closing an overlay or subpage.
+    pub fn go_back(&mut self) -> Vec<Effect> {
+        self.cue(crate::audio::Cue::Back);
+        self.back()
+    }
+
     pub fn hold(&mut self) {
         self.options();
     }
@@ -2851,6 +2925,7 @@ impl State {
                         return vec![];
                     }
                     2 => self.preferences.reduced_motion = !self.preferences.reduced_motion,
+                    12 => self.preferences.ui_sounds = !self.preferences.ui_sounds,
                     4 => {
                         self.subpage = Some(Subpage::Language);
                         self.focus = Target::Choice(self.preferences.language.index());

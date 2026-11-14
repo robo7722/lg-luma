@@ -309,42 +309,122 @@ impl Scene {
         if t >= 1. {
             return;
         }
-        let eased = crate::state::ease_out(t);
-        self.fade(from, eased, 1.);
-        self.shift(from, dx * (1. - eased), dy * (1. - eased));
+        self.fade(from, crate::state::ease_out((t * 1.4).min(1.)), 1.);
+        let motion = 1. - crate::state::spring(t);
+        self.shift(from, dx * motion, dy * motion);
+    }
+
+    /// Liquid cascade: like `glide`, but each draw starts a little later the further down it
+    /// sits (up to `stagger` seconds), and motion springs slightly past its rest and settles.
+    /// Rows therefore flow in top to bottom instead of moving as one sheet.
+    fn cascade(
+        &mut self,
+        from: usize,
+        started: Option<std::time::Instant>,
+        total: f32,
+        dx: f32,
+        dy: f32,
+        stagger: f32,
+    ) {
+        let Some(started) = started else {
+            return;
+        };
+        let elapsed = started.elapsed().as_secs_f32();
+        if elapsed >= total {
+            return;
+        }
+        let duration = (total - stagger).max(0.01);
+        let top = self.draw[from..]
+            .iter()
+            .filter_map(draw_rect)
+            .map(|rect| rect.y)
+            .fold(f32::INFINITY, f32::min);
+        let progress = |y: f32| {
+            let delay = stagger * ((y - top) / 700.).clamp(0., 1.);
+            ((elapsed - delay) / duration).clamp(0., 1.)
+        };
+        let first = progress(top);
+        for draw in &mut self.draw[from..] {
+            let t = draw_rect(draw).map_or(first, |rect| progress(rect.y));
+            let alpha = crate::state::ease_out((t * 1.4).min(1.));
+            let motion = 1. - crate::state::spring(t);
+            animate_draw(draw, alpha, dx * motion, dy * motion);
+        }
     }
 
     fn fade(&mut self, from: usize, alpha: f32, brightness: f32) {
         for draw in &mut self.draw[from..] {
-            let apply = |color: &mut Color| {
-                for channel in &mut color[..3] {
-                    *channel *= brightness;
-                }
-                color[3] *= alpha;
-            };
-            match draw {
-                Draw::Glass(_, _, color)
-                | Draw::Shape(_, _, _, color)
-                | Draw::Shadow(_, _, _, color)
-                | Draw::Text(_, _, _, color, _)
-                | Draw::TintedImage(_, _, _, _, color)
-                | Draw::AppImage(_, _, _, color) => apply(color),
-                Draw::RoundedGradient(_, _, a, b) => {
-                    apply(a);
-                    apply(b);
-                }
-                Draw::Image(path, rect, radius, contain) => {
-                    *draw = Draw::TintedImage(
-                        path.clone(),
-                        *rect,
-                        *radius,
-                        *contain,
-                        [brightness, brightness, brightness, alpha],
-                    );
-                }
-                Draw::Clip(_) | Draw::EdgeFade(_) | Draw::EdgeFadeX(_) => {}
-            }
+            fade_draw(draw, alpha, brightness);
         }
+    }
+}
+
+/// The rectangle a draw occupies, if it has one.
+fn draw_rect(draw: &Draw) -> Option<Rect> {
+    match draw {
+        Draw::Glass(rect, ..)
+        | Draw::Shape(rect, ..)
+        | Draw::RoundedGradient(rect, ..)
+        | Draw::Shadow(rect, ..)
+        | Draw::Text(_, rect, ..)
+        | Draw::Image(_, rect, ..)
+        | Draw::TintedImage(_, rect, ..)
+        | Draw::AppImage(_, rect, ..)
+        | Draw::Clip(Some(rect)) => Some(*rect),
+        _ => None,
+    }
+}
+
+/// Fades and moves a single draw; clip and edge-fade bounds move with their content.
+fn animate_draw(draw: &mut Draw, alpha: f32, dx: f32, dy: f32) {
+    fade_draw(draw, alpha, 1.);
+    match draw {
+        Draw::Glass(rect, ..)
+        | Draw::Shape(rect, ..)
+        | Draw::RoundedGradient(rect, ..)
+        | Draw::Shadow(rect, ..)
+        | Draw::Text(_, rect, ..)
+        | Draw::Image(_, rect, ..)
+        | Draw::TintedImage(_, rect, ..)
+        | Draw::AppImage(_, rect, ..)
+        | Draw::Clip(Some(rect)) => {
+            rect.x += dx;
+            rect.y += dy;
+        }
+        Draw::EdgeFade(Some(edges)) => edges.iter_mut().for_each(|y| *y += dy),
+        Draw::EdgeFadeX(Some(edges)) => edges.iter_mut().for_each(|x| *x += dx),
+        Draw::Clip(None) | Draw::EdgeFade(None) | Draw::EdgeFadeX(None) => {}
+    }
+}
+
+fn fade_draw(draw: &mut Draw, alpha: f32, brightness: f32) {
+    let apply = |color: &mut Color| {
+        for channel in &mut color[..3] {
+            *channel *= brightness;
+        }
+        color[3] *= alpha;
+    };
+    match draw {
+        Draw::Glass(_, _, color)
+        | Draw::Shape(_, _, _, color)
+        | Draw::Shadow(_, _, _, color)
+        | Draw::Text(_, _, _, color, _)
+        | Draw::TintedImage(_, _, _, _, color)
+        | Draw::AppImage(_, _, _, color) => apply(color),
+        Draw::RoundedGradient(_, _, a, b) => {
+            apply(a);
+            apply(b);
+        }
+        Draw::Image(path, rect, radius, contain) => {
+            *draw = Draw::TintedImage(
+                path.clone(),
+                *rect,
+                *radius,
+                *contain,
+                [brightness, brightness, brightness, alpha],
+            );
+        }
+        Draw::Clip(_) | Draw::EdgeFade(_) | Draw::EdgeFadeX(_) => {}
     }
 }
 
@@ -657,10 +737,15 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
         }
         out.control(Target::Retry, retry, false);
     }
-    if let Some(eased) = state.page_transition() {
-        out.fade(content_start, eased, 1.);
-        out.shift(content_start, 0., 80. * (1. - eased));
-    }
+    // The page flows in row by row, springing gently into place.
+    out.cascade(
+        content_start,
+        state.page_glide(),
+        crate::state::PAGE_TRANSITION,
+        0.,
+        80.,
+        0.14,
+    );
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
     header(&mut out, state, assets, now);
@@ -2182,12 +2267,13 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
     let start = out.draw.len();
     settings_content(out, state, assets);
     // A newly chosen section slides in from the right of the sidebar, like a glass sheet.
-    out.glide(
+    out.cascade(
         start,
         state.section_glide(),
         crate::state::SECTION_TRANSITION,
         72.,
         0.,
+        0.1,
     );
     settings_sidebar(out, state, assets);
     // Back to Home without the remote's Home key, left of the sidebar.
@@ -2360,15 +2446,13 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 Subpage::Clock => clock_settings(out, state, assets),
                 _ => unreachable!(),
             }
-            if let Some(opened) = state.panel_started {
-                out.fade(start, (opened.elapsed().as_secs_f32() / 0.15).min(1.), 1.);
-            }
-            out.glide(
+            out.cascade(
                 start,
                 state.panel_started,
                 crate::state::POPUP_TRANSITION,
                 56.,
                 0.,
+                0.08,
             );
             return;
         }
@@ -2519,16 +2603,14 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
         if let Subpage::Input(id) = subpage {
             input_name_rows(out, state, assets, id, 164.8 + 3. * 102.7 + 16. - s);
         }
-        if let Some(opened) = state.panel_started {
-            out.fade(start, (opened.elapsed().as_secs_f32() / 0.15).min(1.), 1.);
-        }
-        // Subpages slide in from the side they open towards.
-        out.glide(
+        // Subpages flow in row by row from the side they open towards.
+        out.cascade(
             start,
             state.panel_started,
             crate::state::POPUP_TRANSITION,
             56.,
             0.,
+            0.08,
         );
         return;
     }
@@ -2573,6 +2655,17 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                     "weather-moon",
                     Some(evening_value.as_str()),
                     true,
+                ),
+                (
+                    12,
+                    "uiSounds",
+                    "volume",
+                    Some(if state.preferences.ui_sounds {
+                        language.t("stateOn")
+                    } else {
+                        language.t("stateOff")
+                    }),
+                    false,
                 ),
                 (
                     2,

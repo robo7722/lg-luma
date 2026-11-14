@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Luma Sound-Set</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #15171a; color: #eee; margin: 24px; }
+  h1 { font-size: 22px; }
+  h2 { font-size: 16px; margin: 20px 0 8px; color: #aab; }
+  p { color: #99a; }
+  button { font-size: 16px; padding: 14px 22px; margin: 0 8px 8px 0; border-radius: 12px;
+           border: 1px solid #444; background: #262a30; color: #fff; cursor: pointer; }
+  button:active { background: #3a4048; }
+  .keep { border-color: #6a8; }
+</style>
+</head>
+<body>
+<h1>Luma Sound-Set – alles aus dem Fokus-Tick</h1>
+<p>Grün umrandet = dein Favorit. Darunter je 3 Varianten (a, b, c).</p>
+<h2>Fokus (Pfeiltaste)</h2>
+<button class="keep" data-s="focus">focus</button>
+<h2>Auswählen (OK)</h2>
+<button data-s="select-a">a – Tick mit tiefem Körper</button>
+<button data-s="select-b">b – Doppel-Tick</button>
+<button data-s="select-c">c – Tick mit Hauch Holz</button>
+<h2>Zurück</h2>
+<button data-s="back-a">a – tiefer Tick</button>
+<button data-s="back-b">b – Doppel-Tick fallend</button>
+<button data-s="back-c">c – tief und weich</button>
+<h2>Ende der Liste</h2>
+<button data-s="bump-a">a – dumpfer Tick</button>
+<button data-s="bump-b">b – dumpfer Doppel-Tick</button>
+<button data-s="bump-c">c – sehr tief</button>
+<script>
+  const ctx = new AudioContext();
+  const cache = {};
+  async function load(name) {
+    if (!cache[name]) {
+      const bytes = await (await fetch(`variants/${name}.wav`)).arrayBuffer();
+      cache[name] = await ctx.decodeAudioData(bytes);
+    }
+    return cache[name];
+  }
+  async function play(name) {
+    if (ctx.state !== "running") await ctx.resume();
+    const s = ctx.createBufferSource();
+    s.buffer = await load(name);
+    s.connect(ctx.destination);
+    s.start();
+  }
+  document.querySelectorAll("[data-s]").forEach(b => b.onclick = () => play(b.dataset.s));
+</script>
+</body>
+</html>

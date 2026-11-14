@@ -4741,5 +4741,22 @@
     "sv": "Egen ordning",
     "cs": "Vlastní pořadí",
     "ca": "Ordre personalitzat"
+  },
+  "uiSounds": {
+    "en": "Sounds",
+    "de": "Töne",
+    "es": "Sonidos",
+    "zh": "提示音",
+    "zh-tw": "提示音",
+    "pt": "Sons",
+    "it": "Suoni",
+    "ru": "Звуки",
+    "pl": "Dźwięki",
+    "fr": "Sons",
+    "vi": "Âm thanh",
+    "nl": "Geluiden",
+    "sv": "Ljud",
+    "cs": "Zvuky",
+    "ca": "Sons"
   }
 }
