@@ -1232,8 +1232,7 @@ fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
             },
         );
     }
-    // Like Apple TV's rows, the favourites run to the screen edge: the next tile shows cut off
-    // at the right (and a scrolled-away one at the left), so it is clear the row continues.
+    // The favourites stay inside the dock card: tiles beyond it are clipped at its edge.
     out.draw.push(Draw::Clip(Some(state.favorites_viewport())));
     // Soft edges: out to the right from the end of the sixth tile, and in from the left once
     // the row has scrolled.

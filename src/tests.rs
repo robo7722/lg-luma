@@ -187,27 +187,31 @@ fn favorites_edge_fragments_share_draw_hit_and_wheel_viewports() {
         .map(|app| app.id.clone())
         .collect();
     state.preferences.favorites = Some(favorites.clone());
+    // The seventh tile starts beyond the dock card, so nothing of it is visible or hittable.
+    assert!(state.hit_test(&controls(&state), 1880., 880.).is_none());
     assert_eq!(
-        state.hit_test(&controls(&state), 1880., 880.),
-        Some(Target::App(favorites[6].clone()))
+        state.hit_test(&controls(&state), 1800., 880.),
+        Some(Target::App(favorites[5].clone()))
     );
-    assert!(state.wheel_scroll(&controls(&state), Some((1880., 880.)), 0, -1));
+    assert!(state.wheel_scroll(&controls(&state), Some((1800., 880.)), 0, -1));
     assert!((state.home_scroll - crate::state::HOME_TILE_PITCH).abs() < 0.01);
     assert_eq!(state.scroll, 0.);
+    // The scrolled-away first tile lies left of the dock card and is clipped away.
+    assert!(state.hit_test(&controls(&state), 40., 880.).is_none());
     assert_eq!(
-        state.hit_test(&controls(&state), 40., 880.),
-        Some(Target::App(favorites[0].clone()))
+        state.hit_test(&controls(&state), 100., 880.),
+        Some(Target::App(favorites[1].clone()))
     );
     let scroll = state.home_scroll;
     state.pointer_focus(Target::App(favorites[0].clone()));
     assert_eq!(state.home_scroll, scroll);
     assert!(state.hit_test(&controls(&state), 4., 880.).is_none());
     assert!(state.hit_test(&controls(&state), 1915., 880.).is_none());
-    assert!(state.hit_test(&controls(&state), 40., 1060.).is_none());
+    assert!(state.hit_test(&controls(&state), 100., 1060.).is_none());
     let scene = scene(&state);
     let viewport = state.favorites_viewport();
     assert!(scene.draw.iter().any(|draw| matches!(draw, crate::renderer::Draw::Clip(Some(rect)) if rect.x == viewport.x && rect.w == viewport.w)));
-    assert!(state.wheel_scroll(&scene.controls, Some((40., 880.)), 0, 1));
+    assert!(state.wheel_scroll(&scene.controls, Some((100., 880.)), 0, 1));
     assert_eq!(state.home_scroll, 0.);
     assert_eq!(state.scroll, 0.);
 }
