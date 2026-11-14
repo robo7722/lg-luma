@@ -1447,6 +1447,13 @@ impl State {
             self.reveal_focus(controls);
             return effects;
         }
+        if let Some(id) = self.moving.clone()
+            && self.page == Page::Apps
+            && matches!(direction, Direction::Down)
+        {
+            // From the dock above the open drawer, Down hands the app back to the drawer.
+            return self.move_out_of_dock(&id);
+        }
         if let Some(id) = self.moving.clone() {
             let mut ids = self.preferences.favorites(&self.inventory.apps);
             let slots: Vec<_> = ids
@@ -2200,36 +2207,74 @@ impl State {
         vec![Effect::Save, Effect::Refresh]
     }
 
+    /// Holding OK opens a card's menu everywhere; its Move action starts reordering.
     pub fn hold(&mut self) {
-        // Dock cards are `App` targets on Home and `DockApp` targets while the drawer is open.
-        let dock_card = match &self.focus {
-            Target::App(id) if self.page == Page::Home => Some(id.clone()),
-            Target::DockApp(id) if self.page == Page::Apps => Some(id.clone()),
-            _ => None,
-        };
-        if self.overlay.is_none()
-            && let Some(id) = dock_card.as_ref()
-        {
-            let dock: Vec<String> = self.dock_apps().iter().map(|app| app.id.clone()).collect();
-            if dock.contains(id) {
-                // Fewer than six favorites are backfilled with other apps. Holding one of those
-                // pins the visible dock in its current order, so every card can be reordered.
-                let mut favorites = self.preferences.favorites(&self.inventory.apps);
-                if !favorites.contains(id) {
-                    for app in dock {
-                        if !favorites.contains(&app) {
-                            favorites.push(app);
-                        }
-                    }
-                    self.preferences.favorites = Some(favorites);
+        self.options();
+    }
+
+    /// Whether `id` is one of the visible dock cards on Home or above the open drawer.
+    pub fn dock_movable(&self, id: &str) -> bool {
+        matches!(self.page, Page::Home | Page::Apps)
+            && self.dock_apps().iter().any(|app| app.id == id)
+    }
+
+    /// Starts reordering a dock card. Backfilled cards (fewer than six favorites) pin the
+    /// visible dock first, so nothing on screen reshuffles.
+    fn start_dock_move(&mut self, id: &str) {
+        let dock: Vec<String> = self.dock_apps().iter().map(|app| app.id.clone()).collect();
+        let mut favorites = self.preferences.favorites(&self.inventory.apps);
+        if !favorites.iter().any(|item| item == id) {
+            for app in dock {
+                if !favorites.contains(&app) {
+                    favorites.push(app);
                 }
-                self.moving = Some(id.clone());
-                self.notice = None;
-                self.dirty = true;
             }
-        } else if self.page != Page::Home || self.overlay.is_some() {
-            self.options();
+            self.preferences.favorites = Some(favorites);
         }
+        self.moving = Some(id.to_owned());
+        self.notice = None;
+        self.dirty = true;
+    }
+
+    /// Down from the dock above the open drawer: the app leaves the favorites and lands in the
+    /// drawer's first row below its column, still moving.
+    fn move_out_of_dock(&mut self, id: &str) -> Vec<Effect> {
+        let dock: Vec<String> = self.dock_apps().iter().map(|app| app.id.clone()).collect();
+        let Some(index) = dock.iter().position(|item| item == id) else {
+            return vec![];
+        };
+        let first_visible = (self.home_scroll / HOME_TILE_PITCH).round() as usize;
+        let column = index.saturating_sub(first_visible).min(APPS_COLUMNS - 1);
+        let drawer: Vec<String> = self
+            .drawer_apps()
+            .iter()
+            .map(|app| app.id.clone())
+            .collect();
+        let mut favorites = self.preferences.favorites(&self.inventory.apps);
+        favorites.retain(|item| item != id);
+        let visible_favorites = favorites
+            .iter()
+            .filter(|item| {
+                !self.preferences.hidden.contains(item)
+                    && self.inventory.apps.iter().any(|app| &app.id == *item)
+            })
+            .count();
+        // With fewer than six favorites the dock backfills from the start of the drawer
+        // order; place the app after those cards so it really appears below its column.
+        let backfill = 6usize.saturating_sub(visible_favorites);
+        let mut order = drawer;
+        order.insert((backfill + column).min(order.len()), id.to_owned());
+        for previous in &self.preferences.app_order {
+            if !order.contains(previous) {
+                order.push(previous.clone());
+            }
+        }
+        self.preferences.favorites = Some(favorites);
+        self.preferences.app_sorting = crate::model::AppSorting::Custom;
+        self.preferences.app_order = order;
+        self.focus = Target::App(id.to_owned());
+        self.dirty = true;
+        vec![Effect::Save]
     }
 
     pub fn text(&mut self, text: &str) {
@@ -2991,6 +3036,19 @@ impl State {
                 return vec![Effect::Save];
             }
             Target::MoveApp => {
+                if let Some(Overlay::Options { id, restore }) = &self.overlay
+                    && !self.managing_apps()
+                    && self.dock_movable(id)
+                {
+                    let (id, restore) = (id.clone(), restore.clone());
+                    self.overlay = None;
+                    self.panel_started = None;
+                    self.focus = restore;
+                    self.start_dock_move(&id);
+                    self.pointer = false;
+                    self.pressed = None;
+                    return vec![];
+                }
                 if let Some(Overlay::Options { id, .. }) = &self.overlay
                     && self.drawer_movable(id)
                 {

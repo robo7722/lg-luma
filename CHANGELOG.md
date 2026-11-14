@@ -5,6 +5,8 @@
 ### Patch Changes
 
 - Fix Settings page and section animations that never played on the TV: their frames were not redrawn, and the first frame of a new page was drawn before the glide began. Popups now also redraw through their whole glide.
+- Holding OK on a dock card opens its menu again (Open, favorites, hide, delete) with a new Move action, instead of starting to reorder straight away.
+- While moving a dock card above the open drawer, Down returns it to the drawer's first row; Up from there brings it back into the dock.
 
 ## 3.4.0
 

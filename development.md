@@ -110,7 +110,7 @@ and the generic disc input icon from the native desktop renderer using seeded lo
 | ----------------------------- | ---------------------------------------------------------------------------- |
 | Arrows                        | Move focus. Down from favorites opens the drawer, Up reaches corner controls |
 | OK / Enter                    | Activate on release                                                          |
-| Hold OK for 600 ms            | Reorder Home favorite or open app options                                    |
+| Hold OK for 600 ms            | Open the card's menu; Move reorders dock and drawer apps                     |
 | OK or Back in move mode       | Finish reordering without launching                                          |
 | Escape / Back / Backspace     | Parent navigation, overlay dismissal or Recent apps from Home                |
 | Hold Back / Escape for 600 ms | Open Recent apps while Luma is focused                                       |
@@ -128,7 +128,7 @@ worker without changing preferences. An active icon read finishes before disk en
 removed, so it cannot restore stale artwork after the reset.
 Home, the app drawer, Inputs and Recent apps launch directly on OK/click. **Settings → Apps** uses
 a three-column artwork gallery like Backgrounds, including hidden apps, and opens the action popup with **Open**, favorite, hide/show and
-**Delete app** actions. Hold OK on Home still reorders favorites.
+**Delete app** actions. Hold OK on Home opens the same menu with Move.
 Background cards open the same side popup with **Use background** first and **Delete background**
 only for inactive backgrounds. Deletion requires confirmation with **Cancel** focused by default.
 Uploaded images are deleted on the wallpaper worker; bundled assets remain in the package, with
