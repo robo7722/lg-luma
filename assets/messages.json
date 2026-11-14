@@ -4690,5 +4690,39 @@
     "sv": "Redigeringssessionen har avslutats",
     "cs": "Relace úprav skončila",
     "ca": "S’ha tancat la sessió d’edició"
+  },
+  "eveningDim": {
+    "en": "Evening mode",
+    "de": "Abend-Modus",
+    "es": "Modo noche",
+    "zh": "夜间模式",
+    "zh-tw": "夜間模式",
+    "pt": "Modo noturno",
+    "it": "Modalità sera",
+    "ru": "Вечерний режим",
+    "pl": "Tryb wieczorny",
+    "fr": "Mode soirée",
+    "vi": "Chế độ buổi tối",
+    "nl": "Avondmodus",
+    "sv": "Kvällsläge",
+    "cs": "Večerní režim",
+    "ca": "Mode vespre"
+  },
+  "eveningDimFrom": {
+    "en": "From {time}",
+    "de": "Ab {time}",
+    "es": "Desde las {time}",
+    "zh": "{time} 起",
+    "zh-tw": "{time} 起",
+    "pt": "A partir das {time}",
+    "it": "Dalle {time}",
+    "ru": "С {time}",
+    "pl": "Od {time}",
+    "fr": "À partir de {time}",
+    "vi": "Từ {time}",
+    "nl": "Vanaf {time}",
+    "sv": "Från {time}",
+    "cs": "Od {time}",
+    "ca": "A partir de les {time}"
   }
 }

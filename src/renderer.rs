@@ -265,6 +265,26 @@ impl Scrim {
     }
 }
 
+/// Brightness factor for the glass backdrop: evening mode's pure-black full-screen scrims
+/// darken the wallpaper, so glass sampling the undimmed wallpaper texture is darkened alike.
+/// Other full-screen fills (such as the tinted Recents backdrop) keep their existing look.
+fn glass_dim(commands: &[Draw]) -> f32 {
+    commands
+        .iter()
+        .filter_map(|command| match command {
+            Draw::Shape(rect, radius, border, color)
+                if full_screen(rect)
+                    && *radius <= 0.
+                    && *border <= 0.
+                    && color[..3] == [0., 0., 0.] =>
+            {
+                Some(1. - color[3].clamp(0., 1.))
+            }
+            _ => None,
+        })
+        .product()
+}
+
 fn intersect(a: [i32; 4], b: [i32; 4]) -> [i32; 4] {
     let x = a[0].max(b[0]);
     let y = a[1].max(b[1]);
@@ -1335,6 +1355,7 @@ impl Renderer {
         });
         let first = backdrops.next();
         let second = backdrops.next();
+        let glass_dim = glass_dim(commands);
         let has_glass = commands.iter().any(|draw| matches!(draw, Draw::Glass(..)));
         let glass_enabled = has_glass
             && self.info.fragment_highp
@@ -1405,6 +1426,10 @@ impl Renderer {
             gl::Uniform1i(
                 gl::GetUniformLocation(self.program, c"u_glass_b".as_ptr()),
                 2,
+            );
+            gl::Uniform1f(
+                gl::GetUniformLocation(self.program, c"u_glass_dim".as_ptr()),
+                glass_dim,
             );
             gl::Uniform1f(
                 gl::GetUniformLocation(self.program, c"u_glass_mix".as_ptr()),

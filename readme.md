@@ -157,7 +157,7 @@ to help make Luma available by default.
 On your computer, replace `TV_IP`:
 
 ```sh
-scp -O dist/com.ecklf.luma_3.2.1_arm.ipk root@TV_IP:/tmp/luma.ipk
+scp -O dist/com.ecklf.luma_3.3.0_arm.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -277,6 +277,14 @@ Choose the interface language in **Settings → General → Language**. Luma sup
 Czech, Dutch, English, French, German, Italian, Polish, Portuguese (Brazil), Russian,
 Simplified Chinese, Spanish, Swedish, Traditional Chinese and Vietnamese.
 
+### Greeting and evening mode
+
+Home greets you by time of day ("Good evening"), optionally with your name. Turn it off or set the
+name in **Settings → Widgets → Greeting**.
+
+**Settings → General → Evening mode** dims the background and glass surfaces from a chosen hour
+(18:00–22:00) until 06:00, fading in and out over 30 minutes.
+
 ### Backgrounds
 
 Open **Settings → Background → Upload**, then scan the QR code or open the shown
@@ -344,7 +352,7 @@ checksum-pinned SDL-webOS library; both downloads are cached under `.build/`.
 Output:
 
 ```text
-dist/com.ecklf.luma_3.2.1_arm.ipk
+dist/com.ecklf.luma_3.3.0_arm.ipk
 dist/sha256sums
 dist/repo.json
 dist/app-icon-large.png

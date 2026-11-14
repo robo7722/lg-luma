@@ -1555,6 +1555,8 @@ fn weather_location_keyboard_back_and_sidebar_routes_restore_focus() {
     state.focus = Target::Sidebar(crate::state::WIDGETS_SECTION);
     state.section = crate::state::WIDGETS_SECTION;
     state.activate();
+    assert_eq!(state.focus, Target::Widget(0));
+    state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Widget(1));
     state.activate();
     assert_eq!(state.focus, Target::WeatherToggle);
@@ -2409,7 +2411,7 @@ fn widgets_group_existing_settings_and_restore_each_parent_without_changing_pref
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Sidebar(WIDGETS_SECTION));
     state.direction(Direction::Right, &controls(&state));
-    assert_eq!(state.focus, Target::Widget(1));
+    assert_eq!(state.focus, Target::Widget(0));
     let widget_order: Vec<_> = controls(&state)
         .into_iter()
         .filter_map(|control| match control.target {
@@ -2417,17 +2419,22 @@ fn widgets_group_existing_settings_and_restore_each_parent_without_changing_pref
             _ => None,
         })
         .collect();
-    assert_eq!(widget_order, [1, 2, 3]);
-    for (index, subpage) in [Subpage::Weather, Subpage::Shortcuts, Subpage::Inputs]
-        .into_iter()
-        .enumerate()
+    assert_eq!(widget_order, [0, 1, 2, 3]);
+    for (index, subpage) in [
+        Subpage::Greeting,
+        Subpage::Weather,
+        Subpage::Shortcuts,
+        Subpage::Inputs,
+    ]
+    .into_iter()
+    .enumerate()
     {
-        state.focus = Target::Widget(index + 1);
+        state.focus = Target::Widget(index);
         state.direction(Direction::Right, &controls(&state));
         assert_eq!(state.subpage, Some(subpage));
         state.back();
         assert!(state.subpage.is_none());
-        assert_eq!(state.focus, Target::Widget(index + 1));
+        assert_eq!(state.focus, Target::Widget(index));
     }
     state.direction(Direction::Left, &controls(&state));
     assert_eq!(state.focus, Target::Sidebar(WIDGETS_SECTION));
@@ -2494,9 +2501,9 @@ fn widgets_are_localized_without_legacy_sidebar_entries() {
                 .iter()
                 .filter(|c| matches!(c.target, Target::Widget(_)))
                 .count(),
-            3
+            4
         );
-        for key in ["widgets", "weather", "shortcuts", "inputs"] {
+        for key in ["widgets", "greeting", "weather", "shortcuts", "inputs"] {
             assert!(page.draw.iter().any(|draw| matches!(draw, crate::renderer::Draw::Text(label, ..) if label == language.t(key))), "{key}/{language:?}");
         }
         state.pointer_focus(Target::Sidebar(0));
@@ -2872,8 +2879,9 @@ fn greeting_visibility_toggle_persists_without_clearing_name_or_hiding_date() {
     state.activate();
     assert!(state.preferences.show_greeting);
     state.open(0);
+    // Shown again on Home, with the saved name.
     assert!(
-        !scene(&state)
+        scene(&state)
             .draw
             .iter()
             .any(|draw| matches!(draw, Draw::Text(label, ..) if label == &greeting))
@@ -3360,4 +3368,33 @@ fn hovering_corner_controls_keeps_their_geometry_and_does_not_change_pages() {
     assert_eq!(state.page, Page::Home);
     state.hover = None;
     assert_eq!(tab(&state), idle);
+}
+
+#[test]
+fn evening_mode_is_chosen_in_general_settings_and_restores_its_row() {
+    use crate::state::Subpage;
+    let mut state = ready();
+    state.open(2);
+    state.focus = Target::Setting(11);
+    state.activate();
+    assert_eq!(state.subpage, Some(Subpage::EveningDim));
+    assert_eq!(state.focus, Target::Choice(0));
+    let choices = controls(&state)
+        .iter()
+        .filter(|control| matches!(control.target, Target::Choice(_)))
+        .count();
+    assert_eq!(choices, crate::model::EVENING_HOURS.len() + 1);
+    state.focus = Target::Choice(3);
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert_eq!(state.preferences.evening_dim, Some(20));
+    assert_eq!(state.subpage, None);
+    assert_eq!(state.focus, Target::Setting(11));
+    state.activate();
+    assert_eq!(state.focus, Target::Choice(3));
+    state.focus = Target::Choice(0);
+    state.activate();
+    assert_eq!(state.preferences.evening_dim, None);
+    let mut invalid: Preferences = serde_json::from_str(r#"{"evening_dim":3}"#).unwrap();
+    invalid.sanitize();
+    assert_eq!(invalid.evening_dim, None);
 }

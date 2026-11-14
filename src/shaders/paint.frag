@@ -8,6 +8,7 @@ uniform bool u_app;
 uniform sampler2D u_glass_a;
 uniform sampler2D u_glass_b;
 uniform float u_glass_mix;
+uniform float u_glass_dim;
 uniform bool u_glass_enabled;
 varying PAINT_PRECISION vec2 v_uv;
 varying PAINT_PRECISION vec4 v_color;
@@ -68,7 +69,7 @@ void main() {
             float slope = rim * rim;
             vec2 uv = (vec2(v_logical_x, v_logical_y) - normal * slope * 9.0) / vec2(1920.0, 1080.0);
             float scattering = mix(0.25, 0.88, smoothstep(0.0, bevel * 2.0, depth));
-            vec3 backdrop = glass_sample(uv, scattering);
+            vec3 backdrop = glass_sample(uv, scattering) * u_glass_dim;
             float luminance = dot(backdrop, vec3(0.2126, 0.7152, 0.0722));
             float focused = step(0.5, v_color.r);
             // Neutral adaptive absorption keeps white labels legible on bright imagery.

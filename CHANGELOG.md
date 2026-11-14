@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.3.0
+
+### Minor Changes
+
+- Show a time-of-day greeting on Home again (Settings → Widgets → Greeting) and add an evening mode in Settings → General that dims the background and glass surfaces from a chosen hour until 06:00.
+
 ## 3.2.1
 
 ### Patch Changes

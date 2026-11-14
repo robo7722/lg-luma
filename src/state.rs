@@ -173,6 +173,7 @@ pub enum Subpage {
     Language,
     AppSorting,
     TextRendering,
+    EveningDim,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -1214,7 +1215,7 @@ impl State {
                     })
                     .unwrap_or(0),
             ),
-            WIDGETS_SECTION => Target::Widget(1),
+            WIDGETS_SECTION => Target::Widget(0),
             APPS_SECTION => self
                 .apps()
                 .first()
@@ -1275,6 +1276,7 @@ impl State {
             Some(Subpage::Language) => Target::Setting(4),
             Some(Subpage::TextRendering) => Target::Setting(7),
             Some(Subpage::AppSorting) => Target::Setting(10),
+            Some(Subpage::EveningDim) => Target::Setting(11),
             None => Target::Sidebar(self.section),
         };
         self.scroll = 0.;
@@ -1540,6 +1542,7 @@ impl State {
                         | Subpage::AppSorting,
                     ) => 2,
                     Some(Subpage::InputIcons(_)) => crate::model::INPUT_ICONS.len() + 1,
+                    Some(Subpage::EveningDim) => crate::model::EVENING_HOURS.len() + 1,
                     Some(Subpage::Language) => Language::ALL.len(),
                     Some(Subpage::DateFormat) => crate::model::DateFormat::ALL.len(),
                     _ => 3,
@@ -2651,6 +2654,25 @@ impl State {
                         self.reset_icon_cache = true;
                         return vec![];
                     }
+                    11 => {
+                        self.subpage = Some(Subpage::EveningDim);
+                        // Choice 0 is Off, then one choice per start hour.
+                        self.focus = Target::Choice(
+                            self.preferences
+                                .evening_dim
+                                .and_then(|hour| {
+                                    crate::model::EVENING_HOURS
+                                        .iter()
+                                        .position(|known| *known == hour)
+                                })
+                                .map_or(0, |index| index + 1),
+                        );
+                        self.scroll = 0.;
+                        if !self.preferences.reduced_motion {
+                            self.panel_started = Some(Instant::now());
+                        }
+                        return vec![];
+                    }
                     7 => {
                         self.subpage = Some(Subpage::TextRendering);
                         self.focus = Target::Choice(self.preferences.text_rendering.index());
@@ -2773,6 +2795,11 @@ impl State {
                         self.preferences.language =
                             Language::ALL[index.min(Language::ALL.len() - 1)];
                         self.weather.cancel_search();
+                    }
+                    Some(Subpage::EveningDim) => {
+                        self.preferences.evening_dim = index
+                            .checked_sub(1)
+                            .and_then(|index| crate::model::EVENING_HOURS.get(index).copied());
                     }
                     Some(Subpage::TextRendering) => {
                         let mode = TextRendering::ALL[index.min(TextRendering::ALL.len() - 1)];

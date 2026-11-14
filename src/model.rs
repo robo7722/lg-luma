@@ -298,6 +298,32 @@ pub struct Preferences {
     pub wallpaper_gradient: bool,
     /// Unix seconds of the last automatic or chosen wallpaper change, for the timed modes.
     pub wallpaper_changed: u64,
+    /// Evening mode: local start hour from which the wallpaper dims until 06:00; None = off.
+    pub evening_dim: Option<u8>,
+}
+
+/// Start hours offered for evening mode.
+pub const EVENING_HOURS: [u8; 5] = [18, 19, 20, 21, 22];
+/// Darkening at full strength, as the opacity of a black fill over the wallpaper.
+pub const EVENING_DIM: f32 = 0.35;
+
+/// Evening-mode darkening for a local time: fades in over 30 minutes from `start`, holds
+/// overnight and fades out over the 30 minutes before 06:00.
+pub fn evening_dim(start: Option<u8>, hour: u8, minute: u8) -> f32 {
+    let Some(start) = start else {
+        return 0.;
+    };
+    let minutes = |h: u8, m: u8| f32::from(h) * 60. + f32::from(m);
+    let now = minutes(hour, minute);
+    let end = minutes(6, 0);
+    let begin = minutes(start, 0);
+    // Minutes since the evening start, wrapping past midnight.
+    let since = (now - begin).rem_euclid(1440.);
+    let until_end = (end - now).rem_euclid(1440.);
+    if since >= (end - begin).rem_euclid(1440.) {
+        return 0.;
+    }
+    EVENING_DIM * (since / 30.).min(1.) * (until_end / 30.).min(1.)
 }
 
 impl Default for Preferences {
@@ -330,6 +356,7 @@ impl Default for Preferences {
             wallpaper_cycle: false,
             wallpaper_gradient: true,
             wallpaper_changed: 0,
+            evening_dim: None,
         }
     }
 }
@@ -459,6 +486,12 @@ impl Preferences {
     }
 
     pub fn sanitize(&mut self) {
+        if self
+            .evening_dim
+            .is_some_and(|hour| !EVENING_HOURS.contains(&hour))
+        {
+            self.evening_dim = None;
+        }
         if self.splash_background.as_ref().is_some_and(|id| {
             !BACKGROUNDS.iter().any(|(known, _)| *known == id) && !crate::wallpapers::valid_id(id)
         }) {
