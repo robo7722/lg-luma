@@ -659,7 +659,7 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
     }
     if let Some(eased) = state.page_transition() {
         out.fade(content_start, eased, 1.);
-        out.shift(content_start, 0., 48. * (1. - eased));
+        out.shift(content_start, 0., 80. * (1. - eased));
     }
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
@@ -2186,10 +2186,21 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
         start,
         state.section_glide(),
         crate::state::SECTION_TRANSITION,
-        40.,
+        72.,
         0.,
     );
     settings_sidebar(out, state, assets);
+    // Back to Home without the remote's Home key, left of the sidebar.
+    let back = Rect::new(84., 168.8, 64., 64.);
+    let focused = state.focus == Target::SettingsHome;
+    out.pill(back, focused, false);
+    out.icon(
+        assets,
+        "left",
+        back.inset(20.),
+        if focused { c(0x242424, 1.) } else { WHITE },
+    );
+    out.control(Target::SettingsHome, back, false);
 }
 
 fn settings_sidebar(out: &mut Scene, state: &State, assets: &Assets) {
@@ -2356,7 +2367,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 start,
                 state.panel_started,
                 crate::state::POPUP_TRANSITION,
-                24.,
+                56.,
                 0.,
             );
             return;
@@ -2516,7 +2527,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
             start,
             state.panel_started,
             crate::state::POPUP_TRANSITION,
-            24.,
+            56.,
             0.,
         );
         return;

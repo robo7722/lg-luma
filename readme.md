@@ -37,6 +37,8 @@ date have been removed.
 - **Left / Right** browses favorites. Hold **OK** to reorder any card in the dock.
 - In the app drawer below the dock, hold **OK** on an app and choose **Move**, then use the arrows
   to place it. The drawer then keeps this **Custom order** (Settings → General → App sorting).
+  Press **Up** from the drawer's first row to move the app into the dock.
+- In Settings, the round **←** button left of the sidebar (or Left from the sidebar) returns Home.
 - **Down** from favorites opens the animated six-column app drawer.
 - **Up** from favorites reaches the corner controls.
 - **Back** closes the drawer and focuses the first favorite.
@@ -159,7 +161,7 @@ to help make Luma available by default.
 On your computer, replace `TV_IP`:
 
 ```sh
-scp -O dist/com.ecklf.luma_3.3.1_arm.ipk root@TV_IP:/tmp/luma.ipk
+scp -O dist/com.ecklf.luma_3.4.0_arm.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -355,7 +357,7 @@ checksum-pinned SDL-webOS library; both downloads are cached under `.build/`.
 Output:
 
 ```text
-dist/com.ecklf.luma_3.3.1_arm.ipk
+dist/com.ecklf.luma_3.4.0_arm.ipk
 dist/sha256sums
 dist/repo.json
 dist/app-icon-large.png

@@ -33,9 +33,9 @@ pub const HOME_FADE_LEFT: f32 = 60.;
 pub const HOME_FADE_RIGHT: f32 = 1860.;
 pub const BACKGROUND_FADE: f32 = 0.4;
 /// Seconds for the Liquid Glass page glide and popup bloom.
-pub const PAGE_TRANSITION: f32 = 0.36;
-pub const POPUP_TRANSITION: f32 = 0.2;
-pub const SECTION_TRANSITION: f32 = 0.26;
+pub const PAGE_TRANSITION: f32 = 0.45;
+pub const POPUP_TRANSITION: f32 = 0.28;
+pub const SECTION_TRANSITION: f32 = 0.34;
 
 /// Cubic ease-out: quick start, soft landing, like a glass sheet settling.
 pub fn ease_out(t: f32) -> f32 {
@@ -117,6 +117,8 @@ pub enum Target {
     TileTest(String),
     TileRemove(String),
     TileEditor,
+    /// Round back button left of the Settings sidebar; returns to Home.
+    SettingsHome,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -698,6 +700,9 @@ impl State {
         let Some(index) = order.iter().position(|item| item == id) else {
             return vec![];
         };
+        if matches!(direction, Direction::Up) && index < APPS_COLUMNS {
+            return self.move_into_dock(id, index);
+        }
         let next = match direction {
             Direction::Left => index.checked_sub(1),
             Direction::Right => Some(index + 1),
@@ -718,6 +723,31 @@ impl State {
         }
         self.preferences.app_sorting = crate::model::AppSorting::Custom;
         self.preferences.app_order = order;
+        self.dirty = true;
+        vec![Effect::Save]
+    }
+
+    /// Up from the drawer's first row: the app joins the dock above its column and stays in
+    /// move mode there, so Left/Right keep placing it among the favorites.
+    fn move_into_dock(&mut self, id: &str, column: usize) -> Vec<Effect> {
+        let dock: Vec<String> = self.dock_apps().iter().map(|app| app.id.clone()).collect();
+        let mut favorites = self.preferences.favorites(&self.inventory.apps);
+        // Backfilled cards become real favorites, so the visible dock does not reshuffle.
+        for app in &dock {
+            if !favorites.contains(app) {
+                favorites.push(app.clone());
+            }
+        }
+        favorites.retain(|item| item != id);
+        let visible_index =
+            ((self.home_scroll / HOME_TILE_PITCH).round() as usize + column).min(dock.len());
+        let position = dock
+            .get(visible_index)
+            .and_then(|anchor| favorites.iter().position(|item| item == anchor))
+            .unwrap_or(favorites.len());
+        favorites.insert(position, id.to_owned());
+        self.preferences.favorites = Some(favorites);
+        self.focus = Target::DockApp(id.to_owned());
         self.dirty = true;
         vec![Effect::Save]
     }
@@ -1710,6 +1740,16 @@ impl State {
                         Target::Sidebar(SETTINGS_ORDER[(position + 1) % SECTION_COUNT]),
                         controls,
                     ),
+                    Direction::Left => self.focus(Target::SettingsHome, controls),
+                }
+                return vec![];
+            }
+            if self.focus == Target::SettingsHome {
+                match direction {
+                    Direction::Right | Direction::Down => {
+                        self.focus(Target::Sidebar(self.section), controls)
+                    }
+                    Direction::Up => self.focus(Target::SettingsMenu, controls),
                     Direction::Left => {}
                 }
                 return vec![];
@@ -2718,6 +2758,10 @@ impl State {
                     return vec![Effect::Save];
                 }
             }
+            Target::SettingsHome => {
+                self.open(0);
+                return vec![];
+            }
             Target::Sidebar(index) => {
                 self.section = index;
                 self.scroll = 0.;
@@ -3163,7 +3207,9 @@ impl State {
             self.focus = self.keyboard_return();
             return self.commit_text_input();
         }
-        if self.page == Page::Settings && matches!(self.focus, Target::Sidebar(_)) {
+        if self.page == Page::Settings
+            && matches!(self.focus, Target::Sidebar(_) | Target::SettingsHome)
+        {
             self.open(0);
             return vec![];
         }

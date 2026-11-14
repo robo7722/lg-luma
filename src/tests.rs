@@ -3466,10 +3466,7 @@ fn drawer_apps_move_in_the_grid_and_keep_a_custom_order() {
         .map(|app| app.id.clone())
         .collect();
     assert_eq!(order[1 + crate::state::APPS_COLUMNS], id);
-    // Up from the first row and moves past the end are ignored.
     state.direction(Direction::Up, &controls(&state));
-    state.direction(Direction::Up, &controls(&state));
-    assert!(state.direction(Direction::Up, &controls(&state)).is_empty());
     assert_eq!(state.focus, Target::App(id.clone()));
     assert!(state.back().is_empty());
     assert!(state.moving.is_none());
@@ -3564,4 +3561,53 @@ fn settings_sections_slide_in_unless_motion_is_reduced() {
     assert!(state.animating());
     state.preferences.reduced_motion = true;
     assert!(state.section_glide().is_none());
+}
+
+#[test]
+fn up_from_the_drawers_first_row_moves_an_app_into_the_dock() {
+    let mut state = ready();
+    state.open(1);
+    state.drawer_visibility = 1.;
+    let dock: Vec<String> = state.dock_apps().iter().map(|app| app.id.clone()).collect();
+    let id = state.drawer_apps()[2].id.clone();
+    state.focus = Target::App(id.clone());
+    state.options();
+    state.focus = Target::MoveApp;
+    state.activate();
+    assert_eq!(state.moving.as_deref(), Some(id.as_str()));
+    assert_eq!(
+        state.direction(Direction::Up, &controls(&state)),
+        vec![Effect::Save]
+    );
+    // It lands above its column (third card) and keeps moving within the dock.
+    let now: Vec<String> = state.dock_apps().iter().map(|app| app.id.clone()).collect();
+    assert_eq!(now[2], id);
+    assert_eq!(&now[..2], &dock[..2]);
+    assert!(!state.drawer_apps().iter().any(|app| app.id == id));
+    assert_eq!(state.focus, Target::DockApp(id.clone()));
+    assert_eq!(
+        state.direction(Direction::Left, &controls(&state)),
+        vec![Effect::Save]
+    );
+    assert_eq!(state.dock_apps()[1].id, id);
+    state.back();
+    assert!(state.moving.is_none());
+}
+
+#[test]
+fn settings_has_a_back_button_to_home() {
+    let mut state = ready();
+    state.open(2);
+    assert!(
+        controls(&state)
+            .iter()
+            .any(|control| control.target == Target::SettingsHome)
+    );
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::SettingsHome);
+    state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.focus, Target::Sidebar(0));
+    state.focus = Target::SettingsHome;
+    state.activate();
+    assert_eq!(state.page, Page::Home);
 }
