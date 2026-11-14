@@ -3706,3 +3706,49 @@ fn holding_a_dock_card_opens_its_menu_with_move() {
     assert!(targets.contains(&Target::MoveApp));
     assert!(targets.contains(&Target::Option(1)));
 }
+
+#[test]
+fn remote_navigation_queues_focus_bump_select_and_back_clicks() {
+    use crate::audio::Cue;
+    let mut state = ready();
+    state.focus = Target::App(state.dock_apps()[0].id.clone());
+    // Moving to the next card clicks; the first card has nothing to its left.
+    state.navigate(Direction::Right, &controls(&state));
+    state.focus = Target::App(state.dock_apps()[0].id.clone());
+    state.navigate(Direction::Left, &controls(&state));
+    assert_eq!(state.cues, [Cue::Focus, Cue::Bump]);
+    state.cues.clear();
+    state.open(2);
+    state.focus = Target::Setting(1);
+    state.confirm();
+    state.go_back();
+    assert_eq!(state.cues, [Cue::Select, Cue::Back]);
+    // Pointer hover and plain state changes never click.
+    state.cues.clear();
+    state.pointer_focus(Target::Sidebar(1));
+    assert!(state.cues.is_empty());
+    // The setting silences every cue and is saved.
+    state.preferences.ui_sounds = false;
+    state.navigate(Direction::Down, &controls(&state));
+    state.confirm();
+    state.go_back();
+    assert!(state.cues.is_empty());
+    let legacy: Preferences = serde_json::from_str("{}").unwrap();
+    assert!(legacy.ui_sounds);
+}
+
+#[test]
+fn the_sounds_setting_toggles_in_general() {
+    let mut state = ready();
+    state.open(2);
+    assert!(
+        controls(&state)
+            .iter()
+            .any(|control| control.target == Target::Setting(12))
+    );
+    state.focus = Target::Setting(12);
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert!(!state.preferences.ui_sounds);
+    state.activate();
+    assert!(state.preferences.ui_sounds);
+}

@@ -276,6 +276,8 @@ pub struct State {
     pub panel_started: Option<Instant>,
     /// Start of the glide between Home/Apps and Settings, set by the event loop.
     pub page_started: Option<Instant>,
+    /// UI click cues to play this frame, drained by the event loop.
+    pub cues: Vec<crate::audio::Cue>,
     /// Start of the glide between Settings sections, set by the event loop.
     pub section_started: Option<Instant>,
     pub weather: weather::Weather,
@@ -327,6 +329,7 @@ impl State {
             update: crate::update::InstallStatus::default(),
             panel_started: None,
             page_started: None,
+            cues: Vec::new(),
             section_started: None,
             weather: weather::Weather::default(),
             keyboard_field: TextField::Apps,
@@ -2208,6 +2211,56 @@ impl State {
     }
 
     /// Holding OK opens a card's menu everywhere; its Move action starts reordering.
+    fn cue(&mut self, cue: crate::audio::Cue) {
+        if self.preferences.ui_sounds {
+            self.cues.push(cue);
+        }
+    }
+
+    /// Remote arrow keys: `direction` plus a Focus click when anything moved, or a Bump when
+    /// the key reached an edge. Pointer hover never calls this.
+    pub fn navigate(&mut self, direction: Direction, controls: &[Control]) -> Vec<Effect> {
+        let before = (
+            self.focus.clone(),
+            self.scroll,
+            self.home_scroll,
+            self.page,
+            self.section,
+            self.subpage.clone(),
+            self.overlay.is_some(),
+            self.recents_open(),
+        );
+        let effects = self.direction(direction, controls);
+        let after = (
+            self.focus.clone(),
+            self.scroll,
+            self.home_scroll,
+            self.page,
+            self.section,
+            self.subpage.clone(),
+            self.overlay.is_some(),
+            self.recents_open(),
+        );
+        self.cue(if before != after || !effects.is_empty() {
+            crate::audio::Cue::Focus
+        } else {
+            crate::audio::Cue::Bump
+        });
+        effects
+    }
+
+    /// OK / Enter (or a pointer click) on the focused target.
+    pub fn confirm(&mut self) -> Vec<Effect> {
+        self.cue(crate::audio::Cue::Select);
+        self.activate()
+    }
+
+    /// The Back key, or closing an overlay or subpage.
+    pub fn go_back(&mut self) -> Vec<Effect> {
+        self.cue(crate::audio::Cue::Back);
+        self.back()
+    }
+
     pub fn hold(&mut self) {
         self.options();
     }
@@ -2851,6 +2904,7 @@ impl State {
                         return vec![];
                     }
                     2 => self.preferences.reduced_motion = !self.preferences.reduced_motion,
+                    12 => self.preferences.ui_sounds = !self.preferences.ui_sounds,
                     4 => {
                         self.subpage = Some(Subpage::Language);
                         self.focus = Target::Choice(self.preferences.language.index());

@@ -162,7 +162,7 @@ to help make Luma available by default.
 On your computer, replace `TV_IP`:
 
 ```sh
-scp -O dist/com.ecklf.luma_3.4.1_arm.ipk root@TV_IP:/tmp/luma.ipk
+scp -O dist/com.ecklf.luma_3.5.0_arm.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -282,6 +282,11 @@ Choose the interface language in **Settings → General → Language**. Luma sup
 Czech, Dutch, English, French, German, Italian, Polish, Portuguese (Brazil), Russian,
 Simplified Chinese, Spanish, Swedish, Traditional Chinese and Vietnamese.
 
+### Sounds
+
+Remote navigation plays short clicks: focus moves, OK, Back, and a soft bump when a list ends.
+Turn them off in **Settings → General → Sounds**. Pointer hover stays silent.
+
 ### Greeting and evening mode
 
 Home greets you by time of day ("Good evening"), optionally with your name. Turn it off or set the
@@ -358,7 +363,7 @@ checksum-pinned SDL-webOS library; both downloads are cached under `.build/`.
 Output:
 
 ```text
-dist/com.ecklf.luma_3.4.1_arm.ipk
+dist/com.ecklf.luma_3.5.0_arm.ipk
 dist/sha256sums
 dist/repo.json
 dist/app-icon-large.png

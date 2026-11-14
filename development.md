@@ -375,6 +375,17 @@ menus drop 14 px, dialogs rise 18 px, option panels slide 16 px from their card 
 56 px, over 0.28 s. Only drawn geometry moves; hit targets stay at their final rects. Reduce motion
 disables all of it.
 
+### UI sounds
+
+`src/audio.rs` embeds `assets/sounds/{focus,select,back,bump}.wav` (48 kHz mono 16-bit PCM,
+generated with ElevenLabs and mixed per `tools/sound-design/README.md`; see
+`assets/licenses/ui-sounds.md`). Clips are decoded once at startup and mixed in SDL's audio callback
+thread (512-sample buffers, up to six overlapping voices); playing only pushes a voice under a short
+lock. `State::navigate`, `confirm` and `go_back` queue cues for remote keys and pointer clicks:
+Focus when an arrow changed anything, Bump when it did not. The event loop drains them. Scripted
+runs and a missing audio device stay silent. `ui_sounds` (default on) is in Settings → General.
+`tools/sound-design/` holds the raw takes and recipe and is not packaged.
+
 ### Bing image of the day
 
 The `luma-bing` worker, started with the wallpaper service and stopped when it is dropped, keeps a

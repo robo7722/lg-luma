@@ -4,6 +4,7 @@ mod app_artwork;
 #[cfg_attr(not(target_arch = "arm"), allow(dead_code))]
 #[path = "app-subscription.rs"]
 mod app_subscription;
+mod audio;
 mod branding;
 mod companion;
 mod damage;
@@ -257,7 +258,7 @@ impl BackButton {
             // Dismiss once and consume the whole physical press, including any
             // subsequent native Exit notification and the final Back release.
             self.consume();
-            state.back()
+            state.go_back()
         } else {
             vec![]
         }
@@ -716,6 +717,12 @@ fn run() -> Result<(), String> {
     startup_stage("preferences and workers");
 
     let sdl = sdl2::init()?;
+    // Scripted desktop captures and tests stay silent; a missing device is never fatal.
+    let sounds = if options.script.is_empty() {
+        audio::Sounds::open(&sdl)
+    } else {
+        audio::Sounds::silent()
+    };
     let drivers: Vec<_> = sdl2::video::drivers().collect();
     if webos && !drivers.contains(&"wayland") {
         return Err(format!(
@@ -1430,16 +1437,12 @@ fn run() -> Result<(), String> {
                             }
                         }
                         Keycode::Up if !repeat || !state.recents_open() => {
-                            pending = state.direction(Direction::Up, &scene.controls);
+                            pending = state.navigate(Direction::Up, &scene.controls);
                         }
-                        Keycode::Down => {
-                            pending = state.direction(Direction::Down, &scene.controls)
-                        }
-                        Keycode::Left => {
-                            pending = state.direction(Direction::Left, &scene.controls)
-                        }
+                        Keycode::Down => pending = state.navigate(Direction::Down, &scene.controls),
+                        Keycode::Left => pending = state.navigate(Direction::Left, &scene.controls),
                         Keycode::Right => {
-                            pending = state.direction(Direction::Right, &scene.controls)
+                            pending = state.navigate(Direction::Right, &scene.controls)
                         }
                         Keycode::Return | Keycode::KpEnter
                             if matches!(state.overlay, Some(Overlay::SystemKeyboard)) =>
@@ -1458,7 +1461,7 @@ fn run() -> Result<(), String> {
                         Keycode::Backspace if state.text_input_active() => state.delete(),
                         Keycode::Backspace if !repeat => {
                             press = None;
-                            pending = state.back();
+                            pending = state.go_back();
                         }
                         Keycode::Clear
                             if matches!(state.overlay, Some(Overlay::SystemKeyboard)) =>
@@ -1486,7 +1489,7 @@ fn run() -> Result<(), String> {
                         pending = if long {
                             state.open_recents()
                         } else {
-                            state.back()
+                            state.go_back()
                         };
                     }
                 }
@@ -1499,7 +1502,7 @@ fn run() -> Result<(), String> {
                         && !held.held
                         && held.target == state.focus
                     {
-                        pending = state.activate();
+                        pending = state.confirm();
                     }
                 }
                 Event::MouseMotion { x, y, .. }
@@ -1560,13 +1563,13 @@ fn run() -> Result<(), String> {
                             && hit(&scene.controls, &window, x, y, &state).as_ref()
                                 == Some(&held.target) =>
                     {
-                        pending = state.activate()
+                        pending = state.confirm()
                     }
                     None if scene.modal.is_some_and(|rect| {
                         pointer_position(&window, x, y).is_some_and(|(x, y)| !rect.contains(x, y))
                     }) =>
                     {
-                        pending = state.back()
+                        pending = state.go_back()
                     }
                     _ => {}
                 },
@@ -1766,6 +1769,9 @@ fn run() -> Result<(), String> {
         if state.panel_started != seen_panel {
             restart_motion |= state.panel_started.is_some();
             seen_panel = state.panel_started;
+        }
+        for cue in state.cues.drain(..) {
+            sounds.play(cue);
         }
         let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit)
             || (visible

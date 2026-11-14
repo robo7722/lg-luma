@@ -2575,6 +2575,17 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                     true,
                 ),
                 (
+                    12,
+                    "uiSounds",
+                    "volume",
+                    Some(if state.preferences.ui_sounds {
+                        language.t("stateOn")
+                    } else {
+                        language.t("stateOff")
+                    }),
+                    false,
+                ),
+                (
                     2,
                     "reducedMotion",
                     "motion",

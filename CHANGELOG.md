@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.5.0
+
+### Minor Changes
+
+- Add short click sounds for remote navigation: a tick when focus moves, a double tick for OK, a falling double tick for Back and a soft bump at the end of a list. Settings → General → Sounds turns them off.
+
 ## 3.4.1
 
 ### Patch Changes

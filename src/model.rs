@@ -305,6 +305,8 @@ pub struct Preferences {
     pub wallpaper_changed: u64,
     /// Evening mode: local start hour from which the wallpaper dims until 06:00; None = off.
     pub evening_dim: Option<u8>,
+    /// Short clicks for remote navigation, OK and Back.
+    pub ui_sounds: bool,
 }
 
 /// Start hours offered for evening mode.
@@ -363,6 +365,7 @@ impl Default for Preferences {
             wallpaper_gradient: true,
             wallpaper_changed: 0,
             evening_dim: None,
+            ui_sounds: true,
         }
     }
 }
