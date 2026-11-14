@@ -38,7 +38,8 @@ export async function isReleaseMerge({ github, context }) {
       pull.merge_commit_sha === context.sha &&
       pull.base.ref === 'main' &&
       pull.base.repo?.full_name === repository &&
-      pull.head.ref === 'changeset-release/main' &&
+      // This fork publishes directly from a merged same-repository PR that already contains the
+      // version bump (`pnpm version:release`); the Version Packages PR remains one such branch.
       pull.head.repo?.full_name === repository,
   );
   if (!release) return false;

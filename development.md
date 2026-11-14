@@ -1079,8 +1079,13 @@ built-in token do not trigger `pull_request` workflows, the release workflow exp
 `ci.yml` for the version branch. Enable **Settings → Actions → General → Allow GitHub Actions to
 create and approve pull requests** in the repository. No additional token or npm secret is needed.
 
+**This fork (robo7722/lg-luma) publishes in one step:** a feature PR runs `pnpm version:release`
+on its branch, so it already contains the version bump and changelog. Merging that PR into `main`
+publishes after CI passes; no Version Packages PR is needed. A changeset merged without a bump
+still produces a Version Packages PR as before.
+
 Review and merge the version PR when ready to release. Only a main-branch push associated with
-that merged, same-repository PR and a numeric version increase can enter the publish job. It must
+a merged, same-repository PR and a numeric version increase can enter the publish job. It must
 also pass the existing checks, desktop smoke tests and native packaging build. Ordinary merges,
 unmerged PRs and manual CI runs do not publish. To retry a failed publication, rerun the original
 CI run for the merged version PR's main-branch commit.

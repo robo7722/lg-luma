@@ -32,7 +32,9 @@ from desktop checks. Add a `pnpm changeset` file for release-worthy changes and 
 bumps to the automated Version Packages PR. Its `pnpm version:release` command synchronizes
 `package.json`, `appinfo.json`, the root `Cargo.toml`, the `luma` entry in `Cargo.lock` and README
 IPK examples. Supporting Rust crates retain independent versions. `pnpm version:check` checks
-consistency without writing files. Code or behavior changes should use semantic versioning:
+consistency without writing files. In the robo7722/lg-luma fork, run `pnpm version:release` on the
+feature branch before opening the PR, so merging it publishes directly. Code or behavior changes
+should use semantic versioning:
 patch for backward-compatible fixes, minor for backward-compatible features, and major for
 breaking changes. Translation updates and additional UI languages, including required font glyph
 coverage, are patch changes. Documentation-only or maintenance changes that do not need a release

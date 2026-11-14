@@ -221,15 +221,17 @@ test('a merged same-repository version PR with an increased version can publish'
   assert.deepEqual(fixture.reads, ['previous-commit', 'merged-commit']);
 });
 
+test('a merged same-repository feature PR that bumps the version can publish', async () => {
+  const head = { ref: 'feature', repo: { full_name: 'ecklf/lg-luma' } };
+  assert.equal(await isReleaseMerge(gateFixture({ pull: { head } })), true);
+  assert.equal(await isReleaseMerge(gateFixture({ pull: { head }, current: '2.0.3' })), false);
+});
+
 test('ordinary merges, unmerged PRs, forks and manual runs cannot publish', async (t) => {
   const cases = [
-    ['feature PR', { pull: { head: { ref: 'feature', repo: { full_name: 'ecklf/lg-luma' } } } }],
     ['unmerged version PR', { pull: { merged_at: null } }],
     ['different merge commit', { pull: { merge_commit_sha: 'other-commit' } }],
-    [
-      'fork version branch',
-      { pull: { head: { ref: 'changeset-release/main', repo: { full_name: 'other/lg-luma' } } } },
-    ],
+    ['fork branch', { pull: { head: { ref: 'feature', repo: { full_name: 'other/lg-luma' } } } }],
     ['deleted head repository', { pull: { head: { ref: 'changeset-release/main', repo: null } } }],
     [
       'different base',
