@@ -31,7 +31,7 @@ jobs:
         id: version
         run: |
           echo "tag=v$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
-      - name: Require a merged Changesets PR and a version increase
+      - name: Require a merged same-repository PR and a version increase
         id: gate
         uses: actions/github-script@v8
         with:
@@ -41,8 +41,8 @@ jobs:
             await core.summary
               .addHeading(`Luma ${process.env.RELEASE_TAG}`)
               .addRaw(publish
-                ? 'Release authorized: this main commit merged Version Packages with a version increase. Publication waits for checks, all four smoke suites, and the verified ARM package.'
-                : 'Validation only: this run cannot publish. Merge the Version Packages PR to start the eligible main-commit release run.')
+                ? 'Release authorized: this main commit merged a same-repository PR with a version increase. Publication waits for checks, all four smoke suites, and the verified ARM package.'
+                : 'Validation only: this run cannot publish. Merge a same-repository PR that bumps the version to start the eligible main-commit release run.')
               .write();
             return publish;
         env:
@@ -303,7 +303,7 @@ jobs:
             '| Stage | Result |', '| --- | --- |',
             ...Object.entries(jobs).map(([name, job]) => `| ${name} | ${job.result} |`), '',
             `[Run and artifacts](${repo}/actions/runs/${process.env.GITHUB_RUN_ID})`, '',
-            eligible ? `[Release page](${repo}/releases/tag/${process.env.RELEASE_TAG})` : 'Merge Version Packages to main to start the release run.', '',
+            eligible ? `[Release page](${repo}/releases/tag/${process.env.RELEASE_TAG})` : 'Merge a same-repository PR that bumps the version to start the release run.', '',
             eligible && jobs.release.result !== 'success' ? 'Retry failed jobs on this original main-commit run after resolving failures. Manual dispatch does not publish.' : '',
           ].join('\n'));
           NODE

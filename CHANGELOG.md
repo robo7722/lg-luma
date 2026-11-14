@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.2.1
+
+### Patch Changes
+
+- bad3e82: Test release to check in-app updates from the robo7722/lg-luma releases; no functional changes.
+
 ## 3.2.0
 
 ### Minor Changes
