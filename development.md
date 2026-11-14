@@ -365,7 +365,9 @@ and takeover boot staging uses a bundled fallback.
 
 Entering or leaving Settings glides the page 48 px up while it fades in (0.36 s, cubic ease-out);
 switching Settings sections slides the section content 40 px in from the right (0.26 s). The event
-loop starts both when the page or section changes, so unit-test scenes stay static. The clock/input
+loop starts both when the page or section changes, so unit-test scenes stay static, and restarts any
+motion that began in a frame once that frame is presented: a page the TV has not drawn before can take
+longer to lay out than the animation lasts. Scripted desktop captures skip page and section glides. The clock/input
 menus drop 14 px, dialogs rise 18 px, option panels slide 16 px from their card and subpages slide
 24 px, over 0.2 s. Only drawn geometry moves; hit targets stay at their final rects. Reduce motion
 disables all of it.

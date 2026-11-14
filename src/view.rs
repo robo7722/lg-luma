@@ -2190,6 +2190,17 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
         0.,
     );
     settings_sidebar(out, state, assets);
+    // Back to Home without the remote's Home key, left of the sidebar.
+    let back = Rect::new(84., 168.8, 64., 64.);
+    let focused = state.focus == Target::SettingsHome;
+    out.pill(back, focused, false);
+    out.icon(
+        assets,
+        "left",
+        back.inset(20.),
+        if focused { c(0x242424, 1.) } else { WHITE },
+    );
+    out.control(Target::SettingsHome, back, false);
 }
 
 fn settings_sidebar(out: &mut Scene, state: &State, assets: &Assets) {

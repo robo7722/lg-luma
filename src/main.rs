@@ -938,6 +938,10 @@ fn run() -> Result<(), String> {
     let mut last_minute = None;
     let mut shown_page = state.page;
     let mut shown_section = state.section;
+    // Motion that started this frame restarts once the frame is on screen: the TV can take
+    // longer than the whole animation to lay out a page it has not drawn before.
+    let mut restart_motion = false;
+    let mut seen_panel = state.panel_started;
     let mut frame = 0u64;
     let mut visible = true;
     let mut running = true;
@@ -976,20 +980,28 @@ fn run() -> Result<(), String> {
         }
         // Entering or leaving Settings glides the page in; Home ↔ Apps keeps the drawer motion.
         if state.page != shown_page {
-            if matches!(state.page, state::Page::Settings)
-                || matches!(shown_page, state::Page::Settings)
+            // Scripted captures run frames faster than wall-clock motion; keep them static.
+            if options.script.is_empty()
+                && (matches!(state.page, state::Page::Settings)
+                    || matches!(shown_page, state::Page::Settings))
             {
                 state.page_started = Some(Instant::now());
+                restart_motion = true;
             }
             shown_page = state.page;
             shown_section = state.section;
         }
         // Switching Settings sections slides the new section's content in beside the sidebar.
         if state.section != shown_section {
-            if state.page == state::Page::Settings {
+            if state.page == state::Page::Settings && options.script.is_empty() {
                 state.section_started = Some(Instant::now());
+                restart_motion = true;
             }
             shown_section = state.section;
+        }
+        if state.panel_started != seen_panel {
+            restart_motion |= state.panel_started.is_some();
+            seen_panel = state.panel_started;
         }
         state.tick();
         wallpaper_service.set_active(wallpaper_upload_active(&state, webos, focused, visible));
@@ -1828,7 +1840,23 @@ fn run() -> Result<(), String> {
                     }
                 }
                 presented += 1;
+                let previous_present = last_present;
                 last_present = Instant::now();
+                if restart_motion {
+                    restart_motion = false;
+                    // Only motion started since the previous frame; finished glides stay finished.
+                    for started in [
+                        &mut state.page_started,
+                        &mut state.section_started,
+                        &mut state.panel_started,
+                    ] {
+                        if started.is_some_and(|at| at > previous_present) {
+                            *started = Some(last_present);
+                        }
+                    }
+                    seen_panel = state.panel_started;
+                    state.dirty = true;
+                }
                 if options.profile_frames.is_some() {
                     profile.record(
                         Instant::now(),

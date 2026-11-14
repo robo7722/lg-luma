@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.4.0
+
+### Minor Changes
+
+- Move apps from the drawer straight into the dock (Up from the first row while moving), add a back button to Home beside the Settings sidebar, and start Settings and popup animations once their first frame is on screen so they are not skipped on slower TVs.
+
 ## 3.3.1
 
 ### Patch Changes
