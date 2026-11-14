@@ -466,6 +466,7 @@ fn gallery_and_grid_navigation_scroll_to_keep_focus_visible() {
     let mut state = ready();
     state.set_wallpapers(vec![crate::wallpapers::Wallpaper {
         id: "custom-00000000000000000000000000000001".into(),
+        version: None,
         directory: PathBuf::from("/preview/wallpapers/custom-00000000000000000000000000000001"),
         has_original: true,
     }]);
@@ -2556,6 +2557,7 @@ fn settings_lists_keep_bottom_padding_for_remote_and_wheel_scrolling() {
                 (1..=8)
                     .map(|index| crate::wallpapers::Wallpaper {
                         id: format!("custom-{index:032x}"),
+                        version: None,
                         directory: std::path::PathBuf::from(".build/padding-fixture"),
                         has_original: true,
                     })

@@ -1118,7 +1118,10 @@ impl State {
     }
 
     pub fn can_delete_background(&self, id: &str) -> bool {
-        id != self.preferences.background && self.background_ids().any(|known| known == id)
+        // The Bing image of the day is a fixed tile that refreshes itself; it cannot be deleted.
+        id != crate::wallpapers::BING_ID
+            && id != self.preferences.background
+            && self.background_ids().any(|known| known == id)
     }
 
     fn background_target(&self, id: &str) -> Target {

@@ -12,13 +12,21 @@ use std::{
     net::TcpStream,
     path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicU64, Ordering},
         mpsc,
     },
     thread,
     time::{Duration, Instant},
 };
+
+/// The Bing image of the day has its own fixed tile instead of taking a gallery slot.
+pub const BING_ID: &str = "bing-daily";
+const BING_ARCHIVE: &str = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=de-DE";
+const BING_ORIGIN: &str = "https://www.bing.com";
+const BING_START: Duration = Duration::from_secs(20);
+const BING_REFRESH: Duration = Duration::from_secs(3 * 60 * 60);
+const BING_RETRY: Duration = Duration::from_secs(15 * 60);
 
 const MAX_BODY: usize = 12 * 1024 * 1024;
 const MAX_WALLPAPERS: usize = 20;
@@ -30,6 +38,9 @@ const STOP: u64 = u64::MAX;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Wallpaper {
     pub id: String,
+    /// Daily images change file names, because the renderer caches textures by path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
     #[serde(skip)]
     pub directory: PathBuf,
     #[serde(skip)]
@@ -37,32 +48,40 @@ pub struct Wallpaper {
 }
 
 impl Wallpaper {
+    fn file(&self, name: &str) -> PathBuf {
+        self.directory.join(match &self.version {
+            Some(version) => format!("{name}-{version}.jpg"),
+            None => format!("{name}.jpg"),
+        })
+    }
     pub fn unshaded_image(&self) -> String {
         // Preserve full resolution for older uploads without an unshaded original.
-        self.directory
-            .join(if self.has_original {
-                "original.jpg"
-            } else {
-                "wallpaper.jpg"
-            })
-            .to_string_lossy()
-            .into_owned()
+        self.file(if self.has_original {
+            "original"
+        } else {
+            "wallpaper"
+        })
+        .to_string_lossy()
+        .into_owned()
     }
     pub fn image(&self) -> String {
-        self.directory
-            .join("wallpaper.jpg")
-            .to_string_lossy()
-            .into_owned()
+        self.file("wallpaper").to_string_lossy().into_owned()
     }
     pub fn thumbnail(&self) -> String {
-        self.directory
-            .join("thumbnail.jpg")
-            .to_string_lossy()
-            .into_owned()
+        self.file("thumbnail").to_string_lossy().into_owned()
     }
 }
 
+/// Bing `startdate` values (`YYYYMMDD`); also keeps versioned file names path-safe.
+fn valid_version(version: &str) -> bool {
+    version.len() == 8 && version.bytes().all(|c| c.is_ascii_digit())
+}
+
 pub fn valid_id(id: &str) -> bool {
+    id == BING_ID || valid_custom_id(id)
+}
+
+fn valid_custom_id(id: &str) -> bool {
     id.strip_prefix("custom-").is_some_and(|id| {
         id.len() == 32
             && id
@@ -86,13 +105,16 @@ enum Command {
 pub struct Service {
     desired: Arc<AtomicU64>,
     wake: mpsc::Sender<Command>,
+    /// Dropping this disconnects the Bing worker, which then stops.
+    _bing: Option<mpsc::Sender<()>>,
     pub receiver: mpsc::Receiver<Event>,
     active: bool,
     generation: u64,
 }
 
 impl Service {
-    pub fn new(preferences: &Path, loopback_only: bool) -> Result<Self, String> {
+    /// `bing` enables the public Bing image-of-the-day download; scripted runs and tests pass false.
+    pub fn new(preferences: &Path, loopback_only: bool, bing: bool) -> Result<Self, String> {
         let directory = preferences
             .parent()
             .unwrap_or(Path::new("."))
@@ -101,6 +123,20 @@ impl Service {
         let worker_desired = desired.clone();
         let (sender, receiver) = mpsc::sync_channel(4);
         let (wake, updates) = mpsc::channel();
+        let catalog_lock = Arc::new(Mutex::new(()));
+        let bing = if bing {
+            let (stop, stopped) = mpsc::channel();
+            let directory = directory.clone();
+            let sender = sender.clone();
+            let catalog_lock = catalog_lock.clone();
+            thread::Builder::new()
+                .name("luma-bing".into())
+                .spawn(move || bing_worker(&directory, &sender, &catalog_lock, &stopped))
+                .map_err(|e| format!("Could not start Bing wallpaper worker: {e}"))?;
+            Some(stop)
+        } else {
+            None
+        };
         thread::Builder::new()
             .name("luma-wallpapers".into())
             .spawn(move || {
@@ -108,6 +144,7 @@ impl Service {
                     &directory,
                     &worker_desired,
                     &sender,
+                    &catalog_lock,
                     &updates,
                     loopback_only,
                 );
@@ -116,6 +153,7 @@ impl Service {
         Ok(Self {
             desired,
             wake,
+            _bing: bing,
             receiver,
             active: false,
             generation: 0,
@@ -196,20 +234,30 @@ fn catalog(directory: &Path) -> Vec<Wallpaper> {
         };
         // Legacy metadata may contain a name; serde ignores it. Identity and
         // selection depend only on the generated ID, never a display label.
-        if item.id != id {
+        if item.id != id || item.version.as_deref().is_some_and(|v| !valid_version(v)) {
             continue;
         }
-        if ["wallpaper.jpg", "thumbnail.jpg"].iter().any(|file| {
-            !fs::symlink_metadata(path.join(file))
-                .is_ok_and(|m| m.is_file() && m.len() > 0 && m.len() <= MAX_BODY as u64)
-        }) {
-            continue;
-        }
-        item.has_original = fs::symlink_metadata(path.join("original.jpg"))
-            .is_ok_and(|m| m.is_file() && m.len() > 0 && m.len() <= MAX_BODY as u64);
         item.directory = path;
+        let usable = |file: PathBuf| {
+            fs::symlink_metadata(file)
+                .is_ok_and(|m| m.is_file() && m.len() > 0 && m.len() <= MAX_BODY as u64)
+        };
+        if !usable(item.file("wallpaper")) || !usable(item.file("thumbnail")) {
+            continue;
+        }
+        item.has_original = usable(item.file("original"));
+        let custom = item.id != BING_ID;
+        if custom
+            && result
+                .iter()
+                .filter(|w: &&Wallpaper| w.id != BING_ID)
+                .count()
+                == MAX_WALLPAPERS
+        {
+            continue;
+        }
         result.push(item);
-        if result.len() == MAX_WALLPAPERS {
+        if result.len() > MAX_WALLPAPERS {
             break;
         }
     }
@@ -218,7 +266,7 @@ fn catalog(directory: &Path) -> Vec<Wallpaper> {
 }
 
 fn delete_wallpaper(directory: &Path, id: &str, selected: &str) -> Result<(), String> {
-    if id == selected || !valid_id(id) || !real_directory(directory) {
+    if id == selected || id == BING_ID || !valid_custom_id(id) || !real_directory(directory) {
         return Err("Background cannot be deleted".into());
     }
     let path = directory.join(id);
@@ -364,20 +412,27 @@ fn jpeg(image: &image::RgbImage, quality: u8) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-fn store(directory: &Path, bytes: &[u8], valid: impl Fn() -> bool) -> Result<Wallpaper, String> {
-    if catalog(directory).len() >= MAX_WALLPAPERS {
-        return Err("The wallpaper gallery is full (20 images)".into());
-    }
+/// Shaded background, unshaded original and thumbnail JPEGs, as stored on disk.
+struct Rendered {
+    image: Vec<u8>,
+    original: Vec<u8>,
+    thumbnail: Vec<u8>,
+}
+
+fn render(bytes: &[u8]) -> Result<Rendered, String> {
     let mut image = decode(bytes)?;
     let original = jpeg(&image, 94)?;
     let thumbnail =
         image::imageops::resize(&image, 480, 270, image::imageops::FilterType::Triangle);
     shade(&mut image);
-    let image = jpeg(&image, 94)?;
-    let thumbnail = jpeg(&thumbnail, 82)?;
-    if !valid() {
-        return Err("Upload session ended".into());
-    }
+    Ok(Rendered {
+        image: jpeg(&image, 94)?,
+        original,
+        thumbnail: jpeg(&thumbnail, 82)?,
+    })
+}
+
+fn prepare(directory: &Path) -> Result<(), String> {
     let parent = directory
         .parent()
         .ok_or("Missing wallpaper directory parent")?;
@@ -387,12 +442,36 @@ fn store(directory: &Path, bytes: &[u8], valid: impl Fn() -> bool) -> Result<Wal
     if !real_directory(parent) {
         return Err("Invalid wallpaper storage parent".into());
     }
-    create_directory(directory)?;
+    create_directory(directory)
+}
+
+fn custom_count(directory: &Path) -> usize {
+    catalog(directory)
+        .iter()
+        .filter(|item| valid_custom_id(&item.id))
+        .count()
+}
+
+fn store(directory: &Path, bytes: &[u8], valid: impl Fn() -> bool) -> Result<Wallpaper, String> {
+    // The Bing tile never takes one of the 20 owner-uploaded slots.
+    if custom_count(directory) >= MAX_WALLPAPERS {
+        return Err("The wallpaper gallery is full (20 images)".into());
+    }
+    let Rendered {
+        image,
+        original,
+        thumbnail,
+    } = render(bytes)?;
+    if !valid() {
+        return Err("Upload session ended".into());
+    }
+    prepare(directory)?;
     let id = format!("custom-{}", random_id()?);
     let staging = directory.join(format!(".{id}"));
     create_directory(&staging)?;
     let item = Wallpaper {
         id: id.clone(),
+        version: None,
         directory: directory.join(&id),
         has_original: true,
     };
@@ -428,10 +507,11 @@ fn worker(
     directory: &Path,
     desired: &AtomicU64,
     sender: &mpsc::SyncSender<Event>,
+    catalog_lock: &Mutex<()>,
     updates: &mpsc::Receiver<Command>,
     loopback_only: bool,
 ) {
-    if sender.send(Event::Catalog(catalog(directory))).is_err() {
+    if !publish(directory, sender, catalog_lock) {
         return;
     }
     let update = |command| match command {
@@ -439,7 +519,7 @@ fn worker(
         Command::Delete { id, selected } => {
             let result = delete_wallpaper(directory, &id, &selected);
             sender.send(Event::Deleted(id, result)).is_ok()
-                && sender.send(Event::Catalog(catalog(directory))).is_ok()
+                && publish(directory, sender, catalog_lock)
         }
     };
     let mut handled = 0;
@@ -500,7 +580,7 @@ fn worker(
                     };
                     match serve(&mut stream, &address.to_string(), &token, directory, valid) {
                         Ok(true) => {
-                            if sender.send(Event::Catalog(catalog(directory))).is_err() {
+                            if !publish(directory, sender, catalog_lock) {
                                 return;
                             }
                         }
@@ -521,6 +601,208 @@ fn worker(
         if sender.send(Event::Ended(generation)).is_err() {
             break;
         }
+    }
+}
+
+/// Both workers read and send under one lock, so an older catalog never arrives last.
+fn publish(directory: &Path, sender: &mpsc::SyncSender<Event>, lock: &Mutex<()>) -> bool {
+    let _guard = lock.lock().unwrap_or_else(|error| error.into_inner());
+    sender.send(Event::Catalog(catalog(directory))).is_ok()
+}
+
+#[derive(Deserialize)]
+struct BingArchive {
+    images: Vec<BingImage>,
+}
+
+#[derive(Deserialize)]
+struct BingImage {
+    startdate: String,
+    urlbase: String,
+}
+
+/// Returns the image version (`startdate`) and its fixed-origin 1920×1080 URL.
+fn parse_bing(bytes: &[u8]) -> Result<(String, String), String> {
+    let archive: BingArchive =
+        serde_json::from_slice(bytes).map_err(|_| "Bing returned unreadable data")?;
+    let image = archive
+        .images
+        .into_iter()
+        .next()
+        .ok_or("Bing returned no image")?;
+    if !valid_version(&image.startdate) {
+        return Err("Bing returned an invalid image date".into());
+    }
+    // A path on the fixed Bing origin only; no other host, scheme or user info can be formed.
+    let base = &image.urlbase;
+    if !base.starts_with("/th?")
+        || base.len() > 256
+        || !base
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"/?=._-&".contains(&c))
+    {
+        return Err("Bing returned an invalid image address".into());
+    }
+    Ok((
+        image.startdate,
+        format!("{BING_ORIGIN}{base}_1920x1080.jpg"),
+    ))
+}
+
+fn bing_version(directory: &Path) -> Option<String> {
+    catalog(directory)
+        .into_iter()
+        .find(|item| item.id == BING_ID)
+        .and_then(|item| item.version)
+}
+
+fn remove_staging(staging: &Path) {
+    if let Ok(entries) = fs::read_dir(staging) {
+        for entry in entries.take(16).flatten() {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+    let _ = fs::remove_dir(staging);
+}
+
+/// Writes a new daily version next to the current one, then switches `metadata.json`
+/// with an atomic rename. The previous version stays until the next update, so a
+/// background that is still drawn from the old path never disappears underneath it.
+fn install_bing(directory: &Path, version: &str, bytes: &[u8]) -> Result<(), String> {
+    if !valid_version(version) {
+        return Err("Invalid Bing image date".into());
+    }
+    let rendered = render(bytes)?;
+    prepare(directory)?;
+    let target = directory.join(BING_ID);
+    let previous = bing_version(directory);
+    let staging = directory.join(format!(".{BING_ID}-{version}"));
+    if fs::symlink_metadata(&staging).is_ok() {
+        if !real_directory(&staging) {
+            return Err("Invalid Bing staging entry".into());
+        }
+        remove_staging(&staging);
+    }
+    create_directory(&staging)?;
+    let item = Wallpaper {
+        id: BING_ID.into(),
+        version: Some(version.into()),
+        directory: staging.clone(),
+        has_original: true,
+    };
+    let names = [
+        format!("wallpaper-{version}.jpg"),
+        format!("original-{version}.jpg"),
+        format!("thumbnail-{version}.jpg"),
+    ];
+    let result = (|| {
+        write_new(&item.file("wallpaper"), &rendered.image)?;
+        write_new(&item.file("original"), &rendered.original)?;
+        write_new(&item.file("thumbnail"), &rendered.thumbnail)?;
+        write_new(
+            &staging.join("metadata.json"),
+            &serde_json::to_vec(&item).map_err(|e| e.to_string())?,
+        )?;
+        if fs::symlink_metadata(&target).is_err() {
+            return fs::rename(&staging, &target).map_err(|e| e.to_string());
+        }
+        if !real_directory(&target) {
+            return Err("Invalid Bing wallpaper directory".into());
+        }
+        for name in &names {
+            fs::rename(staging.join(name), target.join(name)).map_err(|e| e.to_string())?;
+        }
+        // The commit point: readers see either the old or the new complete version.
+        fs::rename(staging.join("metadata.json"), target.join("metadata.json"))
+            .map_err(|e| e.to_string())
+    })();
+    remove_staging(&staging);
+    result?;
+    // Remove older daily files, keeping the current and the previous version.
+    let keep = |name: &str| {
+        name == "metadata.json"
+            || [Some(version), previous.as_deref()]
+                .into_iter()
+                .flatten()
+                .any(|v| name.ends_with(&format!("-{v}.jpg")))
+    };
+    if let Ok(entries) = fs::read_dir(&target) {
+        for entry in entries.take(64).flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !keep(&name) && entry.file_type().is_ok_and(|kind| kind.is_file()) {
+                let _ = fs::remove_file(entry.path());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn bing_get(agent: &ureq::Agent, url: &str, accept: &str) -> Result<Vec<u8>, String> {
+    let mut response = agent
+        .get(url)
+        .header("Accept", accept)
+        .header("User-Agent", "LumaNative")
+        .call()
+        .map_err(|e| format!("Bing is unavailable: {e}"))?;
+    if !response.status().is_success() {
+        return Err(format!("Bing replied {}", response.status()));
+    }
+    let mut bytes = Vec::new();
+    response
+        .body_mut()
+        .as_reader()
+        .take(MAX_BODY as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| "The Bing response could not be read")?;
+    if bytes.len() > MAX_BODY {
+        return Err("The Bing response is too large".into());
+    }
+    Ok(bytes)
+}
+
+/// Returns true when a new daily image was installed.
+fn refresh_bing(agent: &ureq::Agent, directory: &Path) -> Result<bool, String> {
+    let (version, url) = parse_bing(&bing_get(agent, BING_ARCHIVE, "application/json")?)?;
+    if bing_version(directory).as_deref() == Some(version.as_str()) {
+        return Ok(false);
+    }
+    let bytes = bing_get(agent, &url, "image/jpeg")?;
+    install_bing(directory, &version, &bytes)?;
+    Ok(true)
+}
+
+fn bing_worker(
+    directory: &Path,
+    sender: &mpsc::SyncSender<Event>,
+    catalog_lock: &Mutex<()>,
+    stop: &mpsc::Receiver<()>,
+) {
+    let agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(30)))
+        .max_redirects(0)
+        .proxy(None)
+        .build()
+        .new_agent();
+    // Give the TV's network a moment after a cold boot before the first request.
+    let mut delay = BING_START;
+    loop {
+        match stop.recv_timeout(delay) {
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            _ => return,
+        }
+        delay = match refresh_bing(&agent, directory) {
+            Ok(true) => {
+                if !publish(directory, sender, catalog_lock) {
+                    return;
+                }
+                BING_REFRESH
+            }
+            Ok(false) => BING_REFRESH,
+            Err(error) => {
+                eprintln!("Luma Bing wallpaper: {error}");
+                BING_RETRY
+            }
+        };
     }
 }
 
