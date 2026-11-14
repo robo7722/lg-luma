@@ -367,7 +367,10 @@ Entering or leaving Settings glides the page 80 px up while it fades in (0.45 s,
 switching Settings sections slides the section content 72 px in from the right (0.34 s). The event
 loop starts both when the page or section changes, so unit-test scenes stay static, and restarts any
 motion that began in a frame once that frame is presented: a page the TV has not drawn before can take
-longer to lay out than the animation lasts. Scripted desktop captures skip page and section glides. The clock/input
+longer to lay out than the animation lasts. Scripted desktop captures skip page and section glides.
+The main loop only draws when `State::dirty` is set, so `State::tick` marks every running page,
+section and popup glide dirty and clears it with one final redraw at rest; page and section changes
+are detected after input, right before drawing, so a new page's first frame is already gliding. The clock/input
 menus drop 14 px, dialogs rise 18 px, option panels slide 16 px from their card and subpages slide
 56 px, over 0.28 s. Only drawn geometry moves; hit targets stay at their final rects. Reduce motion
 disables all of it.

@@ -3611,3 +3611,32 @@ fn settings_has_a_back_button_to_home() {
     state.activate();
     assert_eq!(state.page, Page::Home);
 }
+
+#[test]
+fn running_glides_keep_redrawing_until_they_settle() {
+    let mut state = ready();
+    state.open(2);
+    let started = std::time::Instant::now();
+    state.page_started = Some(started);
+    state.section_started = Some(started);
+    state.dirty = false;
+    state.tick();
+    // Each frame of a glide must be drawn, not only the first one.
+    assert!(state.dirty);
+    assert!(state.page_started.is_some() && state.section_started.is_some());
+    let long_ago = started - std::time::Duration::from_secs(2);
+    state.page_started = Some(long_ago);
+    state.section_started = Some(long_ago);
+    state.panel_started = Some(long_ago);
+    state.dirty = false;
+    state.tick();
+    // One last redraw at rest, then the glides end.
+    assert!(state.dirty);
+    assert!(state.page_started.is_none());
+    assert!(state.section_started.is_none());
+    assert!(state.panel_started.is_none());
+    // Popups keep animating for their whole glide, not just the short fade.
+    state.panel_started = Some(std::time::Instant::now() - std::time::Duration::from_millis(200));
+    state.tick();
+    assert!(state.panel_started.is_some());
+}

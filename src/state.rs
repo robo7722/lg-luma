@@ -445,10 +445,22 @@ impl State {
         }
         if let Some(start) = self.panel_started {
             self.dirty = true;
-            let duration = if self.overlay.is_some() { 120 } else { 150 };
-            if self.preferences.reduced_motion || start.elapsed() >= Duration::from_millis(duration)
+            // Long enough for the fade and the glide; the frame after it shows the final layout.
+            if self.preferences.reduced_motion || start.elapsed().as_secs_f32() >= POPUP_TRANSITION
             {
                 self.panel_started = None;
+            }
+        }
+        // Page and section glides redraw every frame while they run, plus once at rest.
+        for (started, duration) in [
+            (&mut self.page_started, PAGE_TRANSITION),
+            (&mut self.section_started, SECTION_TRANSITION),
+        ] {
+            if let Some(start) = *started {
+                self.dirty = true;
+                if self.preferences.reduced_motion || start.elapsed().as_secs_f32() >= duration {
+                    *started = None;
+                }
             }
         }
         if self

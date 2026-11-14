@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.4.1
+
+### Patch Changes
+
+- Fix Settings page and section animations that never played on the TV: their frames were not redrawn, and the first frame of a new page was drawn before the glide began. Popups now also redraw through their whole glide.
+
 ## 3.4.0
 
 ### Minor Changes
