@@ -33,9 +33,9 @@ pub const HOME_FADE_LEFT: f32 = 60.;
 pub const HOME_FADE_RIGHT: f32 = 1860.;
 pub const BACKGROUND_FADE: f32 = 0.4;
 /// Seconds for the Liquid Glass page glide and popup bloom.
-pub const PAGE_TRANSITION: f32 = 0.36;
-pub const POPUP_TRANSITION: f32 = 0.2;
-pub const SECTION_TRANSITION: f32 = 0.26;
+pub const PAGE_TRANSITION: f32 = 0.45;
+pub const POPUP_TRANSITION: f32 = 0.28;
+pub const SECTION_TRANSITION: f32 = 0.34;
 
 /// Cubic ease-out: quick start, soft landing, like a glass sheet settling.
 pub fn ease_out(t: f32) -> f32 {

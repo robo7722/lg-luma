@@ -659,7 +659,7 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
     }
     if let Some(eased) = state.page_transition() {
         out.fade(content_start, eased, 1.);
-        out.shift(content_start, 0., 48. * (1. - eased));
+        out.shift(content_start, 0., 80. * (1. - eased));
     }
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
@@ -2186,7 +2186,7 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
         start,
         state.section_glide(),
         crate::state::SECTION_TRANSITION,
-        40.,
+        72.,
         0.,
     );
     settings_sidebar(out, state, assets);
@@ -2367,7 +2367,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 start,
                 state.panel_started,
                 crate::state::POPUP_TRANSITION,
-                24.,
+                56.,
                 0.,
             );
             return;
@@ -2527,7 +2527,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
             start,
             state.panel_started,
             crate::state::POPUP_TRANSITION,
-            24.,
+            56.,
             0.,
         );
         return;
