@@ -33,13 +33,20 @@ pub const HOME_FADE_LEFT: f32 = 60.;
 pub const HOME_FADE_RIGHT: f32 = 1860.;
 pub const BACKGROUND_FADE: f32 = 0.4;
 /// Seconds for the Liquid Glass page glide and popup bloom.
-pub const PAGE_TRANSITION: f32 = 0.45;
-pub const POPUP_TRANSITION: f32 = 0.28;
-pub const SECTION_TRANSITION: f32 = 0.34;
+pub const PAGE_TRANSITION: f32 = 0.56;
+pub const POPUP_TRANSITION: f32 = 0.34;
+pub const SECTION_TRANSITION: f32 = 0.42;
 
 /// Cubic ease-out: quick start, soft landing, like a glass sheet settling.
 pub fn ease_out(t: f32) -> f32 {
     1. - (1. - t.clamp(0., 1.)).powi(3)
+}
+
+/// Liquid spring: eases out, travels about 4 % past its target and settles back at 1.
+pub fn spring(t: f32) -> f32 {
+    let u = t.clamp(0., 1.) - 1.;
+    let overshoot = 1.15;
+    1. + (overshoot + 1.) * u * u * u + overshoot * u * u
 }
 pub const CYCLE_FADE: f32 = 1.6;
 
@@ -553,6 +560,13 @@ impl State {
             .filter(|_| !self.preferences.reduced_motion)?;
         let t = started.elapsed().as_secs_f32() / PAGE_TRANSITION;
         (t < 1.).then(|| ease_out(t))
+    }
+
+    /// Start of a running page glide, unless motion is reduced.
+    pub fn page_glide(&self) -> Option<Instant> {
+        self.page_started.filter(|started| {
+            !self.preferences.reduced_motion && started.elapsed().as_secs_f32() < PAGE_TRANSITION
+        })
     }
 
     /// Start of a running Settings section glide, unless motion is reduced.

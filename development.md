@@ -363,6 +363,11 @@ and takeover boot staging uses a bundled fallback.
 
 ### Liquid Glass motion
 
+Page, section and subpage entrances use `Scene::cascade`: each draw starts up to 0.14 s / 0.1 s /
+0.08 s later the further down it sits, fades in with an ease-out and moves with `state::spring`, an
+ease-out-back curve that overshoots about 4 % and settles. Totals: page 0.56 s, section 0.42 s,
+popup/subpage 0.34 s.
+
 Entering or leaving Settings glides the page 80 px up while it fades in (0.45 s, cubic ease-out);
 switching Settings sections slides the section content 72 px in from the right (0.34 s). The event
 loop starts both when the page or section changes, so unit-test scenes stay static, and restarts any
