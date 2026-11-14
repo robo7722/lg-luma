@@ -146,7 +146,7 @@ clear cached artwork and reload it without changing your preferences.
 Add this custom repository URL to Homebrew Channel:
 
 ```text
-https://github.com/ecklf/lg-luma/releases/latest/download/repo.json
+https://github.com/robo7722/lg-luma/releases/latest/download/repo.json
 ```
 
 Upvote [the official Homebrew Channel repository PR](https://github.com/webosbrew/apps-repo/pull/343)
