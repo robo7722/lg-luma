@@ -1,0 +1,12 @@
+<!-- Original Luma weather artwork, MIT. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<defs>
+<linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffe14d"/><stop offset="1" stop-color="#ffb21a"/></linearGradient>
+<linearGradient id="cloud" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#d6dee8"/></linearGradient>
+<linearGradient id="dark" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c3cad4"/><stop offset="1" stop-color="#7f8a98"/></linearGradient>
+<linearGradient id="moon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbfcff"/><stop offset="1" stop-color="#c9d4e6"/></linearGradient>
+<linearGradient id="drop" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#6cc8ff"/><stop offset="1" stop-color="#1e8cff"/></linearGradient>
+<linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffe14d"/><stop offset="1" stop-color="#ff9f0a"/></linearGradient>
+</defs>
+<defs><linearGradient id="cloud4" x1="0" y1="36.0" x2="0" y2="144.0" gradientUnits="userSpaceOnUse"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#d3dce7"/></linearGradient></defs><g fill="url(#cloud4)"><circle cx="95.0" cy="104.0" r="38.0"/><circle cx="141.0" cy="86.0" r="50.0"/><circle cx="183.0" cy="112.0" r="32.0"/><rect x="57.0" y="100.0" width="158.0" height="44.0" rx="22.0"/></g><rect x="48" y="168" width="160" height="12" rx="6" fill="#c9d2dd"/><rect x="70" y="194" width="130" height="12" rx="6" fill="#c9d2dd"/><rect x="56" y="220" width="110" height="12" rx="6" fill="#c9d2dd"/>
+</svg>

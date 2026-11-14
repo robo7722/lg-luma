@@ -395,6 +395,5 @@ See [Releases](development.md#releases) for the workflow and repository setup.
 
 ## License
 
-Luma's code is licensed under MIT. Bundled [Breezy Weather icons](assets/weather/README.md)
-are separately licensed under LGPL-3.0.\
+Luma's code and its bundled [weather icons](assets/weather/README.md) are licensed under MIT.\
 Luma is not affiliated with LG, Apple, or any other brands shown in its UI.

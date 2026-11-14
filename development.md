@@ -172,8 +172,9 @@ with a tighter 48-pixel spacing for Languages and Backgrounds.
 The Home greeting and standalone date, along with their widget entries, are removed. Their legacy
 preferences remain readable and are not erased during other edits. Weather occupies the former
 greeting area with a large condition icon, temperature, condition and location. The colored, static
-icons are original Breezy Weather PNGs, including clear/partly-cloudy night variants, bundled locally
-with their LGPL-3.0 license, attribution and source hashes in `assets/weather/`. No icons are fetched at runtime.
+icons are original MIT artwork in a flat style, including clear/partly-cloudy night variants and
+distinct drizzle and rain. `assets/weather/` holds the SVG sources; `node tools/weather-icons.mjs`
+renders the bundled 256 px PNGs and pins their hashes. No icons are fetched at runtime.
 Disabled weather
 is hidden. Enabled weather without a location uses the same large 144px artwork and a prominent setup action.
 Settings lists render behind fixed controls. The drawer grid is clipped below its fixed dock so

@@ -8,6 +8,7 @@
 
 ### Patch Changes
 
+- Replace the weather icons with original, flat and colourful MIT artwork; drizzle and rain now look different.
 - Show where today's Bing image was taken, small below the dock on Home while it is the background.
 - Show Zattoo with a colourful original TV icon (white-framed screen with "TV") instead of its monochrome wordmark, and use the Plex logo for the PlxNative app (`com.beb.plxnative`).
 

@@ -3,28 +3,30 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import test from 'node:test';
 import sharp from 'sharp';
+import { names } from '../tools/weather-icons.mjs';
 
 const directory = new URL('../assets/weather/', import.meta.url);
 
-test('Breezy weather artwork preserves pinned source bytes, color, alpha and licenses', async () => {
+test('original weather icons have SVG sources, pinned PNGs, colour and transparency', async () => {
   const hashes = JSON.parse(await fs.readFile(new URL('checksums.json', directory), 'utf8'));
-  assert.equal(Object.keys(hashes).length, 10);
-  for (const [file, expected] of Object.entries(hashes)) {
+  assert.deepEqual(Object.keys(hashes).sort(), names.map((name) => `${name}.png`).sort());
+  for (const name of names) {
+    const svg = await fs.readFile(new URL(`${name}.svg`, directory), 'utf8');
+    assert.match(svg, /Original Luma weather artwork, MIT/);
+    assert.doesNotMatch(svg, /<image\b|<text\b|href=/, name);
+    const file = `${name}.png`;
     const data = await fs.readFile(new URL(file, directory));
-    assert.equal(createHash('sha256').update(data).digest('hex'), expected, file);
+    assert.equal(createHash('sha256').update(data).digest('hex'), hashes[file], file);
     const metadata = await sharp(data).metadata();
     assert.equal(metadata.format, 'png');
-    assert.ok(metadata.width >= 112 && metadata.height >= 112, file);
+    assert.equal(metadata.width, 256, file);
+    assert.equal(metadata.height, 256, file);
     assert.equal(metadata.hasAlpha, true, file);
-    const rgba = await sharp(data).toColourspace('srgb').ensureAlpha().png().toBuffer();
-    const stats = await sharp(rgba).stats();
+    const stats = await sharp(data).stats();
     assert.equal(stats.channels[3].min, 0, file);
     assert.ok(
       stats.channels.slice(0, 3).some((channel) => channel.stdev > 10),
       file,
     );
-  }
-  for (const file of ['COPYING', 'COPYING.LESSER', 'LICENSE_ADDITIONAL', 'README.md']) {
-    assert.ok((await fs.readFile(new URL(file, directory), 'utf8')).length > 100);
   }
 });
