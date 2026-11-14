@@ -1,5 +1,16 @@
 # lg-luma
 
+## 3.2.0
+
+### Minor Changes
+
+- 67a378b: Add Bing's image of the day as its own daily-changing background tile, and clip Home favourites to the dock so the next app no longer peeks outside it.
+
+### Patch Changes
+
+- aa8917d: Sharpen the Bing image of the day slightly to offset the TV scaling the 1080p interface to 4K panels.
+- 79bf2e5: Check for and install updates from the robo7722/lg-luma releases instead of the upstream project.
+
 ## 3.1.0
 
 ### Minor Changes
