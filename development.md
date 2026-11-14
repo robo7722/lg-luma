@@ -385,7 +385,7 @@ disables all of it.
 `src/audio.rs` embeds `assets/sounds/{focus,select,back,bump}.wav` (48 kHz mono 16-bit PCM,
 generated with ElevenLabs and mixed per `tools/sound-design/README.md`; see
 `assets/licenses/ui-sounds.md`). Clips are decoded once at startup and mixed in SDL's audio callback
-thread (512-sample buffers, up to six overlapping voices); playing only pushes a voice under a short
+thread at half the clips' level (512-sample buffers, up to six overlapping voices); playing only pushes a voice under a short
 lock. `State::navigate`, `confirm` and `go_back` queue cues for remote keys and pointer clicks:
 Focus when an arrow changed anything, Bump when it did not; a Settings section change also queues
 a faint Glide (mixed at 30 %, skipped with Reduce motion). The event loop drains them. Scripted

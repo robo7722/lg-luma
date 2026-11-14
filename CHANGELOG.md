@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.5.1
+
+### Patch Changes
+
+- Play all UI sounds at half their previous volume.
+
 ## 3.5.0
 
 ### Minor Changes
