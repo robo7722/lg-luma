@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.3.1
+
+### Patch Changes
+
+- Animate more of Settings: switching sections slides the new content in, and opening or leaving Settings glides further. Holding OK on a dock card now also reorders it while the app drawer is open.
+
 ## 3.3.0
 
 ### Minor Changes

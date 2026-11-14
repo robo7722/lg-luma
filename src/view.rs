@@ -659,7 +659,7 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
     }
     if let Some(eased) = state.page_transition() {
         out.fade(content_start, eased, 1.);
-        out.shift(content_start, 0., 28. * (1. - eased));
+        out.shift(content_start, 0., 48. * (1. - eased));
     }
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
@@ -2179,7 +2179,16 @@ fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
 }
 
 fn settings(out: &mut Scene, state: &State, assets: &Assets) {
+    let start = out.draw.len();
     settings_content(out, state, assets);
+    // A newly chosen section slides in from the right of the sidebar, like a glass sheet.
+    out.glide(
+        start,
+        state.section_glide(),
+        crate::state::SECTION_TRANSITION,
+        40.,
+        0.,
+    );
     settings_sidebar(out, state, assets);
 }
 
