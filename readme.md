@@ -294,7 +294,8 @@ its 16:9 crop before choosing **Save to TV**.
 The upload link works only while its TV dialog is open and focused.
 
 A **Bing** tile with Microsoft Bing's image of the day appears in the gallery once Luma has
-downloaded it. Select it for a background that changes daily. It does not use one of the 20 upload
+downloaded it. Select it for a background that changes daily; Home then shows where the photo was taken, small
+below the dock. It does not use one of the 20 upload
 slots and cannot be deleted.
 
 Enable **Rotation** beside **Upload** to cycle through backgrounds on each Luma restart and every

@@ -5,6 +5,7 @@ fn custom(index: u32) -> Wallpaper {
     Wallpaper {
         id: format!("custom-{index:032x}"),
         version: None,
+        caption: None,
         directory: PathBuf::from(format!("/preview/wallpapers/custom-{index:032x}")),
         has_original: true,
     }
@@ -835,10 +836,34 @@ fn the_bing_tile_is_selectable_but_never_deletable() {
     let bing = Wallpaper {
         id: crate::wallpapers::BING_ID.into(),
         version: Some("20261113".into()),
+        caption: None,
         directory: PathBuf::from("/preview/wallpapers/bing-daily"),
         has_original: true,
     };
     state.set_wallpapers(vec![bing, custom(1)]);
     assert!(!state.can_delete_background(crate::wallpapers::BING_ID));
     assert!(state.can_delete_background(&custom(1).id));
+}
+
+#[test]
+fn the_bing_caption_shows_on_home_only_while_bing_is_the_background() {
+    let mut state = ready();
+    let bing = Wallpaper {
+        id: crate::wallpapers::BING_ID.into(),
+        version: Some("20261113".into()),
+        caption: Some("Victoria Harbour, Hongkong, China".into()),
+        directory: PathBuf::from("/preview/wallpapers/bing-daily"),
+        has_original: true,
+    };
+    state.set_wallpapers(vec![bing]);
+    let shown = |state: &State| {
+        scene(state).draw.iter().any(|draw| {
+            matches!(draw, Draw::Text(label, ..) if label == "Victoria Harbour, Hongkong, China")
+        })
+    };
+    assert!(!shown(&state));
+    state.preferences.background = crate::wallpapers::BING_ID.into();
+    assert!(shown(&state));
+    state.open(2);
+    assert!(!shown(&state));
 }

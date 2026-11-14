@@ -373,7 +373,10 @@ upload pipeline (shading, original, thumbnail) after a mild 3×3 unsharp mask th
 TV scaling the 1080p UI plane to 4K panels. Files are versioned (`wallpaper-<startdate>.jpg`)
 because textures are cached by path. New files are written in a dot-prefixed staging directory,
 moved into `wallpapers/bing-daily/`, and committed by atomically renaming `metadata.json`; the
-previous day's files remain until the next update. Scripted runs, simulated update previews and
+previous day's files remain until the next update. The place from Bing's `copyright` line (without the
+bracketed photo credit) is stored as a bounded, single-line `caption`; a same-day reply with a
+different caption only rewrites `metadata.json`. Home shows it right-aligned below the dock while
+the Bing tile is the background. Scripted runs, simulated update previews and
 tests never start the worker. Like uploads, it is not used as LG's launch splash.
 
 The fixed actions are **Upload**, **Gradient**, and **Rotation**, from left to right.

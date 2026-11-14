@@ -1214,6 +1214,34 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
         out.controls.truncate(controls);
     }
     favorites_dock(out, state, assets);
+    bing_caption(out, state, assets);
+}
+
+/// Where today's Bing image was taken, small and right-aligned below the dock, only while it
+/// is the background.
+fn bing_caption(out: &mut Scene, state: &State, assets: &Assets) {
+    let Some(caption) = state
+        .wallpapers
+        .iter()
+        .find(|item| {
+            item.id == crate::wallpapers::BING_ID && item.id == state.preferences.background
+        })
+        .and_then(|item| item.caption.as_deref())
+    else {
+        return;
+    };
+    let start = out.draw.len();
+    let style = text(17.6, 500, -0.01).right();
+    let (label, style) = assets.fit_line(caption, style, 1100., 14.);
+    let height = style.size * style.line_height;
+    out.text(
+        label,
+        Rect::new(1836. - 1100., 1022., 1100., height),
+        style,
+        c(0xffffff, 0.62),
+        false,
+    );
+    out.fade(start, 1. - state.drawer_progress(), 1.);
 }
 
 /// Time-of-day greeting between the header pills and the weather widget.
