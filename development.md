@@ -346,7 +346,7 @@ only the selected 1920×1080 JPEG crop. The native worker independently verifies
 exact output dimensions, a 12 MiB transport cap and a 32 MiB decoder allocation limit. It strips
 source metadata by re-encoding, generates a 480×270 thumbnail, and applies the same base opacity
 and readability gradients as bundled wallpapers. Processing and discovery run off the SDL thread;
-GPU uploads remain on SDL. Nothing is fetched from external services.
+GPU uploads remain on SDL. The upload server fetches nothing from external services.
 
 The gallery holds up to 20 uploaded images under `wallpapers/custom-<random-id>/` beside the
 selected preferences file. The phone page shows this resolved absolute directory path. Names are
@@ -359,6 +359,21 @@ renders the bundled default without destroying the saved selection. These files 
 updates, and normal/takeover launches using the shared preferences location use the same gallery.
 Custom images are not used as LG's launch splash: runtime splash updates are skipped for them,
 and takeover boot staging uses a bundled fallback.
+
+### Bing image of the day
+
+The `luma-bing` worker, started with the wallpaper service and stopped when it is dropped, keeps a
+fixed `bing-daily` tile that never takes one of the 20 upload slots and cannot be deleted. It
+appears after the first successful download. About 20 seconds after launch and then every three
+hours (15 minutes after a failure), it reads
+`https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=de-DE` with a 30-second timeout,
+no proxy or redirects and a 12 MiB reply cap. When `startdate` changes, it downloads the
+fixed-origin `urlbase` + `_1920x1080.jpg`, which must decode at exactly 1920×1080, and runs the
+upload pipeline (shading, original, thumbnail). Files are versioned (`wallpaper-<startdate>.jpg`)
+because textures are cached by path. New files are written in a dot-prefixed staging directory,
+moved into `wallpapers/bing-daily/`, and committed by atomically renaming `metadata.json`; the
+previous day's files remain until the next update. Scripted runs, simulated update previews and
+tests never start the worker. Like uploads, it is not used as LG's launch splash.
 
 The fixed actions are **Upload**, **Gradient**, and **Rotation**, from left to right.
 **Gradient** toggles readability shading immediately without moving the controls. Its
@@ -926,7 +941,7 @@ runtime font/translation services or telemetry are used. Weather attribution: Op
 ## Update availability
 
 On interactive desktop or TV startup a separate worker checks
-`https://github.com/ecklf/lg-luma/releases/latest/download/repo.json` once per process automatically.
+`https://github.com/robo7722/lg-luma/releases/latest/download/repo.json` (this fork's releases) once per process automatically.
 **Settings → System → Check again** retries on the same worker, with one request in flight at a time.
 It only reads the `com.ecklf.luma` package/manifest version and compares numeric major/minor/patch
 components with the compiled version. Equal, older, malformed or prerelease versions do not offer

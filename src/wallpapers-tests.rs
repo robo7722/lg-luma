@@ -152,7 +152,7 @@ fn deletion_rejects_symlink_roots_and_entries_and_never_follows_internal_symlink
 fn worker_reports_deletion_before_the_updated_catalog() {
     let fixture = Fixture::new();
     let item = store(&fixture.wallpapers(), &image(1920, 1080), || true).unwrap();
-    let service = Service::new(&fixture.0.join("preferences.json"), true).unwrap();
+    let service = Service::new(&fixture.0.join("preferences.json"), true, false).unwrap();
     assert!(
         matches!(service.receiver.recv_timeout(Duration::from_secs(5)).unwrap(), Event::Catalog(items) if items.len() == 1)
     );
@@ -237,6 +237,7 @@ fn gallery_capacity_is_checked_before_decoding_or_creating_another_upload() {
             &directory.join("metadata.json"),
             &serde_json::to_vec(&Wallpaper {
                 id,
+                version: None,
                 directory: directory.clone(),
                 has_original: false,
             })
@@ -459,7 +460,7 @@ fn qr_generation_is_deterministic_and_has_a_reasonable_size() {
 #[test]
 fn session_closure_revokes_the_socket_and_reopening_rotates_the_capability() {
     let fixture = Fixture::new();
-    let mut service = Service::new(&fixture.0.join("preferences.json"), true).unwrap();
+    let mut service = Service::new(&fixture.0.join("preferences.json"), true, false).unwrap();
     assert!(matches!(
         service
             .receiver
@@ -520,7 +521,7 @@ fn session_closure_revokes_the_socket_and_reopening_rotates_the_capability() {
 #[test]
 fn cancelling_a_slow_request_releases_the_worker_without_waiting_for_the_body() {
     let fixture = Fixture::new();
-    let mut service = Service::new(&fixture.0.join("preferences.json"), true).unwrap();
+    let mut service = Service::new(&fixture.0.join("preferences.json"), true, false).unwrap();
     service
         .receiver
         .recv_timeout(Duration::from_secs(3))
@@ -546,4 +547,131 @@ fn cancelling_a_slow_request_releases_the_worker_without_waiting_for_the_body() 
         Event::Ended(_)
     ));
     assert!(catalog(&fixture.wallpapers()).is_empty());
+}
+
+const BING_REPLY: &str = r#"{"images":[{"startdate":"20261113","fullstartdate":"202611132300",
+"url":"/th?id=OHR.BlueHK_DE-DE1662761141_1920x1080.jpg&rf=LaDigue_1920x1080.jpg&pid=hp",
+"urlbase":"/th?id=OHR.BlueHK_DE-DE1662761141","copyright":"Victoria Harbour"}],
+"tooltips":{"loading":"Wird geladen..."}}"#;
+
+#[test]
+fn bing_archive_replies_yield_a_fixed_origin_full_hd_url() {
+    assert_eq!(
+        parse_bing(BING_REPLY.as_bytes()).unwrap(),
+        (
+            "20261113".into(),
+            "https://www.bing.com/th?id=OHR.BlueHK_DE-DE1662761141_1920x1080.jpg".into()
+        )
+    );
+    for reply in [
+        "not json",
+        r#"{"images":[]}"#,
+        r#"{"images":[{"startdate":"2026111","urlbase":"/th?id=OHR.A"}]}"#,
+        r#"{"images":[{"startdate":"../../x1","urlbase":"/th?id=OHR.A"}]}"#,
+        r#"{"images":[{"startdate":"20261113","urlbase":"@evil.example/th?id=A"}]}"#,
+        r#"{"images":[{"startdate":"20261113","urlbase":"//evil.example/a"}]}"#,
+        r#"{"images":[{"startdate":"20261113","urlbase":"/th?id=A B"}]}"#,
+    ] {
+        assert!(parse_bing(reply.as_bytes()).is_err(), "{reply}");
+    }
+}
+
+#[test]
+fn bing_ids_and_versioned_paths_stay_separate_from_uploads() {
+    assert!(valid_id(BING_ID));
+    assert!(!valid_custom_id(BING_ID));
+    assert!(!valid_id("bing-daily-2"));
+    let item = Wallpaper {
+        id: BING_ID.into(),
+        version: Some("20261113".into()),
+        directory: PathBuf::from("/w/bing-daily"),
+        has_original: true,
+    };
+    assert_eq!(item.image(), "/w/bing-daily/wallpaper-20261113.jpg");
+    assert_eq!(item.unshaded_image(), "/w/bing-daily/original-20261113.jpg");
+    assert_eq!(item.thumbnail(), "/w/bing-daily/thumbnail-20261113.jpg");
+    assert!(valid_version("20261113"));
+    assert!(!valid_version("2026111a") && !valid_version("../x") && !valid_version(""));
+}
+
+#[test]
+fn daily_images_replace_the_previous_day_without_taking_a_gallery_slot() {
+    let fixture = Fixture::new();
+    let directory = fixture.wallpapers();
+    install_bing(&directory, "20261112", &image(1920, 1080)).unwrap();
+    install_bing(&directory, "20261113", &image(1920, 1080)).unwrap();
+    let items = catalog(&directory);
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].id, BING_ID);
+    assert_eq!(items[0].version.as_deref(), Some("20261113"));
+    assert!(items[0].has_original);
+    assert_eq!(image::open(items[0].image()).unwrap().width(), 1920);
+    assert_eq!(bing_version(&directory).as_deref(), Some("20261113"));
+    // Two days are kept, so a texture still drawn from yesterday's path survives the switch.
+    install_bing(&directory, "20261114", &image(1920, 1080)).unwrap();
+    let mut files: Vec<_> = fs::read_dir(directory.join(BING_ID))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    files.sort();
+    assert_eq!(
+        files,
+        [
+            "metadata.json",
+            "original-20261113.jpg",
+            "original-20261114.jpg",
+            "thumbnail-20261113.jpg",
+            "thumbnail-20261114.jpg",
+            "wallpaper-20261113.jpg",
+            "wallpaper-20261114.jpg",
+        ]
+    );
+    // No staging directories remain.
+    assert_eq!(fs::read_dir(&directory).unwrap().count(), 1);
+    // Wrong dimensions or invalid versions never replace the current image.
+    assert!(install_bing(&directory, "20261115", &image(1280, 720)).is_err());
+    assert!(install_bing(&directory, "../../x", &image(1920, 1080)).is_err());
+    assert_eq!(bing_version(&directory).as_deref(), Some("20261114"));
+    assert_eq!(fs::read_dir(&directory).unwrap().count(), 1);
+    // It can never be deleted, even when not selected.
+    assert!(delete_wallpaper(&directory, BING_ID, "dunes").is_err());
+    assert!(directory.join(BING_ID).is_dir());
+    assert_eq!(custom_count(&directory), 0);
+}
+
+#[test]
+fn the_bing_tile_does_not_count_toward_the_upload_limit() {
+    let fixture = Fixture::new();
+    let directory = fixture.wallpapers();
+    install_bing(&directory, "20261113", &image(1920, 1080)).unwrap();
+    for index in 0..MAX_WALLPAPERS - 1 {
+        let id = format!("custom-{index:032x}");
+        let path = directory.join(&id);
+        create_directory(&path).unwrap();
+        let item = Wallpaper {
+            id,
+            version: None,
+            directory: path.clone(),
+            has_original: false,
+        };
+        write_new(
+            &path.join("metadata.json"),
+            &serde_json::to_vec(&item).unwrap(),
+        )
+        .unwrap();
+        write_new(&path.join("wallpaper.jpg"), b"fixture").unwrap();
+        write_new(&path.join("thumbnail.jpg"), b"fixture").unwrap();
+    }
+    assert_eq!(custom_count(&directory), MAX_WALLPAPERS - 1);
+    // The 20th upload still fits next to the Bing tile.
+    store(&directory, &image(1920, 1080), || true).unwrap();
+    let items = catalog(&directory);
+    assert_eq!(items.len(), MAX_WALLPAPERS + 1);
+    assert_eq!(items[0].id, BING_ID);
+    // A full gallery is rejected before decoding, so placeholder bytes suffice.
+    assert!(
+        store(&directory, b"fixture", || true)
+            .unwrap_err()
+            .contains("full")
+    );
 }

@@ -4,6 +4,7 @@ use crate::{model::BACKGROUNDS, renderer::Draw, wallpapers::Wallpaper};
 fn custom(index: u32) -> Wallpaper {
     Wallpaper {
         id: format!("custom-{index:032x}"),
+        version: None,
         directory: PathBuf::from(format!("/preview/wallpapers/custom-{index:032x}")),
         has_original: true,
     }
@@ -826,4 +827,18 @@ fn removed_popup_entry_closes_safely_and_preference_sanitizing_protects_the_sele
             .any(|id| id == "dunes" || id == "../bad")
     );
     assert!(state.preferences.deleted_backgrounds.len() <= 1);
+}
+
+#[test]
+fn the_bing_tile_is_selectable_but_never_deletable() {
+    let mut state = ready();
+    let bing = Wallpaper {
+        id: crate::wallpapers::BING_ID.into(),
+        version: Some("20261113".into()),
+        directory: PathBuf::from("/preview/wallpapers/bing-daily"),
+        has_original: true,
+    };
+    state.set_wallpapers(vec![bing, custom(1)]);
+    assert!(!state.can_delete_background(crate::wallpapers::BING_ID));
+    assert!(state.can_delete_background(&custom(1).id));
 }

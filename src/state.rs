@@ -22,13 +22,15 @@ pub const DRAWER_PADDING: f32 = 24.;
 pub const INVENTORY_RETRIES: u32 = 5;
 pub const INVENTORY_RETRY_DELAY: Duration = Duration::from_secs(2);
 pub const HOME_STRIP_LEFT: f32 = 84.;
-// Six favourites in full and the seventh cut off and fading out at the right (Apple TV rows):
-// the strip ends after the sixth tile, so a focused tile never sits in the fade.
+// Six favourites in full; the strip ends after the sixth tile, so a focused tile never sits in
+// the fade.
 pub const HOME_STRIP_RIGHT: f32 = 1836.;
 pub const HOME_TILE_WIDTH: f32 = 270.;
 pub const HOME_TILE_PITCH: f32 = 296.4;
-pub const HOME_FADE_LEFT: f32 = 8.;
-pub const HOME_FADE_RIGHT: f32 = 1910.;
+// The favourites are clipped to the dock card (x 60..1860), so neighbouring tiles never show
+// outside the dock; they fade out across its inner padding instead.
+pub const HOME_FADE_LEFT: f32 = 60.;
+pub const HOME_FADE_RIGHT: f32 = 1860.;
 pub const BACKGROUND_FADE: f32 = 0.4;
 pub const CYCLE_FADE: f32 = 1.6;
 
@@ -1116,7 +1118,10 @@ impl State {
     }
 
     pub fn can_delete_background(&self, id: &str) -> bool {
-        id != self.preferences.background && self.background_ids().any(|known| known == id)
+        // The Bing image of the day is a fixed tile that refreshes itself; it cannot be deleted.
+        id != crate::wallpapers::BING_ID
+            && id != self.preferences.background
+            && self.background_ids().any(|known| known == id)
     }
 
     fn background_target(&self, id: &str) -> Target {
