@@ -369,7 +369,8 @@ hours (15 minutes after a failure), it reads
 `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=de-DE` with a 30-second timeout,
 no proxy or redirects and a 12 MiB reply cap. When `startdate` changes, it downloads the
 fixed-origin `urlbase` + `_1920x1080.jpg`, which must decode at exactly 1920×1080, and runs the
-upload pipeline (shading, original, thumbnail). Files are versioned (`wallpaper-<startdate>.jpg`)
+upload pipeline (shading, original, thumbnail) after a mild 3×3 unsharp mask that offsets the
+TV scaling the 1080p UI plane to 4K panels. Files are versioned (`wallpaper-<startdate>.jpg`)
 because textures are cached by path. New files are written in a dot-prefixed staging directory,
 moved into `wallpapers/bing-daily/`, and committed by atomically renaming `metadata.json`; the
 previous day's files remain until the next update. Scripted runs, simulated update previews and

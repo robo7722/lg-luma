@@ -27,6 +27,8 @@ const BING_ORIGIN: &str = "https://www.bing.com";
 const BING_START: Duration = Duration::from_secs(20);
 const BING_REFRESH: Duration = Duration::from_secs(3 * 60 * 60);
 const BING_RETRY: Duration = Duration::from_secs(15 * 60);
+/// Mild unsharp-mask strength that offsets the TV scaling the 1080p UI plane to a 4K panel.
+const BING_SHARPEN: f32 = 0.6;
 
 const MAX_BODY: usize = 12 * 1024 * 1024;
 const MAX_WALLPAPERS: usize = 20;
@@ -419,8 +421,36 @@ struct Rendered {
     thumbnail: Vec<u8>,
 }
 
-fn render(bytes: &[u8]) -> Result<Rendered, String> {
+/// Unsharp mask with a 3×3 binomial blur; one extra frame-sized copy, no float buffers.
+fn sharpen(image: &mut image::RgbImage, amount: f32) {
+    let source = image.clone();
+    let (width, height) = source.dimensions();
+    let weights = [1., 2., 1.];
+    for (x, y, pixel) in image.enumerate_pixels_mut() {
+        let mut blurred = [0f32; 3];
+        for (dy, wy) in weights.iter().enumerate() {
+            let sy = (y + dy as u32).saturating_sub(1).min(height - 1);
+            for (dx, wx) in weights.iter().enumerate() {
+                let sx = (x + dx as u32).saturating_sub(1).min(width - 1);
+                let sample = source.get_pixel(sx, sy);
+                for (channel, value) in blurred.iter_mut().enumerate() {
+                    *value += sample[channel] as f32 * wx * wy;
+                }
+            }
+        }
+        for (channel, value) in blurred.iter().enumerate() {
+            let original = pixel[channel] as f32;
+            let result = original + amount * (original - value / 16.);
+            pixel[channel] = result.round().clamp(0., 255.) as u8;
+        }
+    }
+}
+
+fn render(bytes: &[u8], sharpened: bool) -> Result<Rendered, String> {
     let mut image = decode(bytes)?;
+    if sharpened {
+        sharpen(&mut image, BING_SHARPEN);
+    }
     let original = jpeg(&image, 94)?;
     let thumbnail =
         image::imageops::resize(&image, 480, 270, image::imageops::FilterType::Triangle);
@@ -461,7 +491,7 @@ fn store(directory: &Path, bytes: &[u8], valid: impl Fn() -> bool) -> Result<Wal
         image,
         original,
         thumbnail,
-    } = render(bytes)?;
+    } = render(bytes, false)?;
     if !valid() {
         return Err("Upload session ended".into());
     }
@@ -672,7 +702,7 @@ fn install_bing(directory: &Path, version: &str, bytes: &[u8]) -> Result<(), Str
     if !valid_version(version) {
         return Err("Invalid Bing image date".into());
     }
-    let rendered = render(bytes)?;
+    let rendered = render(bytes, true)?;
     prepare(directory)?;
     let target = directory.join(BING_ID);
     let previous = bing_version(directory);

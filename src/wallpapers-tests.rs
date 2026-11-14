@@ -675,3 +675,16 @@ fn the_bing_tile_does_not_count_toward_the_upload_limit() {
             .contains("full")
     );
 }
+
+#[test]
+fn sharpening_keeps_flat_areas_and_raises_edge_contrast() {
+    let mut flat = image::RgbImage::from_pixel(8, 8, image::Rgb([90, 120, 200]));
+    sharpen(&mut flat, BING_SHARPEN);
+    assert!(flat.pixels().all(|p| p.0 == [90, 120, 200]));
+    let mut edge =
+        image::RgbImage::from_fn(8, 8, |x, _| image::Rgb([if x < 4 { 60 } else { 180 }; 3]));
+    sharpen(&mut edge, BING_SHARPEN);
+    assert!(edge.get_pixel(3, 4)[0] < 60 && edge.get_pixel(4, 4)[0] > 180);
+    assert_eq!(edge.get_pixel(0, 4)[0], 60);
+    assert_eq!(edge.get_pixel(7, 4)[0], 180);
+}
