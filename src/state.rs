@@ -33,8 +33,9 @@ pub const HOME_FADE_LEFT: f32 = 60.;
 pub const HOME_FADE_RIGHT: f32 = 1860.;
 pub const BACKGROUND_FADE: f32 = 0.4;
 /// Seconds for the Liquid Glass page glide and popup bloom.
-pub const PAGE_TRANSITION: f32 = 0.32;
+pub const PAGE_TRANSITION: f32 = 0.36;
 pub const POPUP_TRANSITION: f32 = 0.2;
+pub const SECTION_TRANSITION: f32 = 0.26;
 
 /// Cubic ease-out: quick start, soft landing, like a glass sheet settling.
 pub fn ease_out(t: f32) -> f32 {
@@ -273,6 +274,8 @@ pub struct State {
     pub panel_started: Option<Instant>,
     /// Start of the glide between Home/Apps and Settings, set by the event loop.
     pub page_started: Option<Instant>,
+    /// Start of the glide between Settings sections, set by the event loop.
+    pub section_started: Option<Instant>,
     pub weather: weather::Weather,
     pub keyboard_field: TextField,
     pub greeting_name_draft: String,
@@ -322,6 +325,7 @@ impl State {
             update: crate::update::InstallStatus::default(),
             panel_started: None,
             page_started: None,
+            section_started: None,
             weather: weather::Weather::default(),
             keyboard_field: TextField::Apps,
             greeting_name_draft: String::new(),
@@ -534,8 +538,16 @@ impl State {
         (t < 1.).then(|| ease_out(t))
     }
 
+    /// Start of a running Settings section glide, unless motion is reduced.
+    pub fn section_glide(&self) -> Option<Instant> {
+        self.section_started.filter(|started| {
+            !self.preferences.reduced_motion && started.elapsed().as_secs_f32() < SECTION_TRANSITION
+        })
+    }
+
     pub fn animating(&self) -> bool {
         self.page_transition().is_some()
+            || self.section_glide().is_some()
             || (self.drawer_visibility != if self.page == Page::Apps { 1. } else { 0. })
             || (!self.preferences.reduced_motion
                 && self.input_status_visibility.iter().any(|(id, value)| {
@@ -1387,6 +1399,7 @@ impl State {
         }
         if let Some(id) = self.moving.clone()
             && self.page == Page::Apps
+            && !self.dock_apps().iter().any(|app| app.id == id)
         {
             let effects = self.move_in_drawer(&id, direction);
             self.reveal_focus(controls);
@@ -2136,11 +2149,17 @@ impl State {
     }
 
     pub fn hold(&mut self) {
-        if self.page == Page::Home && self.overlay.is_none() {
+        // Dock cards are `App` targets on Home and `DockApp` targets while the drawer is open.
+        let dock_card = match &self.focus {
+            Target::App(id) if self.page == Page::Home => Some(id.clone()),
+            Target::DockApp(id) if self.page == Page::Apps => Some(id.clone()),
+            _ => None,
+        };
+        if self.overlay.is_none()
+            && let Some(id) = dock_card.as_ref()
+        {
             let dock: Vec<String> = self.dock_apps().iter().map(|app| app.id.clone()).collect();
-            if let Target::App(id) = &self.focus
-                && dock.contains(id)
-            {
+            if dock.contains(id) {
                 // Fewer than six favorites are backfilled with other apps. Holding one of those
                 // pins the visible dock in its current order, so every card can be reordered.
                 let mut favorites = self.preferences.favorites(&self.inventory.apps);
@@ -2156,7 +2175,7 @@ impl State {
                 self.notice = None;
                 self.dirty = true;
             }
-        } else {
+        } else if self.page != Page::Home || self.overlay.is_some() {
             self.options();
         }
     }

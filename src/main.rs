@@ -937,6 +937,7 @@ fn run() -> Result<(), String> {
     let mut back_button = BackButton::default();
     let mut last_minute = None;
     let mut shown_page = state.page;
+    let mut shown_section = state.section;
     let mut frame = 0u64;
     let mut visible = true;
     let mut running = true;
@@ -981,6 +982,14 @@ fn run() -> Result<(), String> {
                 state.page_started = Some(Instant::now());
             }
             shown_page = state.page;
+            shown_section = state.section;
+        }
+        // Switching Settings sections slides the new section's content in beside the sidebar.
+        if state.section != shown_section {
+            if state.page == state::Page::Settings {
+                state.section_started = Some(Instant::now());
+            }
+            shown_section = state.section;
         }
         state.tick();
         wallpaper_service.set_active(wallpaper_upload_active(&state, webos, focused, visible));

@@ -3524,3 +3524,44 @@ fn settings_glides_in_without_moving_hit_targets_unless_motion_is_reduced() {
     assert!(state.page_transition().is_none());
     assert_eq!(first_text(&scene(&state)), first_text(&settled));
 }
+
+#[test]
+fn dock_cards_reorder_while_the_drawer_is_open() {
+    let mut state = ready();
+    state.open(1);
+    state.drawer_visibility = 1.;
+    let dock: Vec<String> = state.dock_apps().iter().map(|app| app.id.clone()).collect();
+    state.focus = Target::DockApp(dock[0].clone());
+    state.hold();
+    assert!(state.overlay.is_none());
+    assert_eq!(state.moving.as_deref(), Some(dock[0].as_str()));
+    assert_eq!(
+        state.direction(Direction::Right, &controls(&state)),
+        vec![Effect::Save]
+    );
+    let favorites = state.preferences.favorites(&state.inventory.apps);
+    assert_eq!(favorites[1], dock[0]);
+    assert_eq!(favorites[0], dock[1]);
+    // Drawer apps still open their menu on hold.
+    let drawer = state.drawer_apps()[0].id.clone();
+    state.back();
+    state.focus = Target::App(drawer);
+    state.hold();
+    assert!(matches!(
+        state.overlay,
+        Some(crate::state::Overlay::Options { .. })
+    ));
+}
+
+#[test]
+fn settings_sections_slide_in_unless_motion_is_reduced() {
+    let mut state = ready();
+    state.open(2);
+    state.section = 1;
+    assert!(state.section_glide().is_none());
+    state.section_started = Some(std::time::Instant::now());
+    assert!(state.section_glide().is_some());
+    assert!(state.animating());
+    state.preferences.reduced_motion = true;
+    assert!(state.section_glide().is_none());
+}
