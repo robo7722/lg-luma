@@ -17,6 +17,7 @@
     "pnpm-lock.yaml",
     "assets/fonts/**",
     "assets/licenses/**",
-    "assets/ui-icons/**"
+    "assets/ui-icons/**",
+    "tools/sound-design/**"
   ]
 }
