@@ -8,7 +8,7 @@
 
 ### Patch Changes
 
-- Show Zattoo with a colourful original TV icon instead of its monochrome wordmark, and use the Plex logo for the PlxNative app (`com.beb.plxnative`).
+- Show Zattoo with a colourful original TV icon (white-framed screen with "TV") instead of its monochrome wordmark, and use the Plex logo for the PlxNative app (`com.beb.plxnative`).
 
 ## 3.2.1
 

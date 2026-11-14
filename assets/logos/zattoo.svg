@@ -1,25 +1,15 @@
-<!-- Original Luma TV artwork for Zattoo, MIT. A warm-coloured counterpart to the Live TV icon. -->
+<!-- Original Luma TV artwork for Zattoo, MIT: a white-framed screen with a green-to-blue glow. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="rim" x1="29" y1="25" x2="94" y2="109" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffd7a8"/>
-      <stop offset="1" stop-color="#f0607a"/>
-    </linearGradient>
-    <linearGradient id="screen" x1="29" y1="29" x2="96" y2="88" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffb35c"/>
-      <stop offset=".45" stop-color="#ff6a4d"/>
-      <stop offset="1" stop-color="#c62d7a"/>
+    <linearGradient id="screen" x1="22" y1="28" x2="106" y2="84" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3fe0a0"/>
+      <stop offset=".45" stop-color="#4cd3d0"/>
+      <stop offset="1" stop-color="#2f86d8"/>
     </linearGradient>
   </defs>
-  <ellipse cx="64" cy="113" rx="33" ry="4" fill="#000" fill-opacity=".16"/>
-  <path d="M60.6 26.4 45.2 12.4l2.7-3 15.4 14z" fill="url(#rim)"/>
-  <path d="M67.4 26.4l15.4-14-2.7-3-15.4 14z" fill="url(#rim)"/>
-  <circle cx="45.6" cy="10" r="4.2" fill="#ffd7a8"/>
-  <circle cx="82.4" cy="10" r="4.2" fill="#ffd7a8"/>
-  <rect x="58" y="88" width="12" height="19" rx="4" fill="url(#rim)"/>
-  <rect x="43" y="105" width="42" height="6" rx="3" fill="url(#rim)"/>
-  <rect x="14" y="25" width="100" height="68" rx="14" fill="url(#rim)"/>
-  <rect x="18" y="29" width="92" height="60" rx="10" fill="url(#screen)"/>
-  <path d="M54 45.5c0-2.2 2.4-3.6 4.3-2.5l24 13.5a2.9 2.9 0 0 1 0 5l-24 13.5c-1.9 1.1-4.3-.3-4.3-2.5z" fill="#fff"/>
-  <circle cx="99" cy="40" r="3" fill="#fff6b0"/>
+  <rect x="12" y="20" width="104" height="70" rx="7" fill="#fff"/>
+  <rect x="17.5" y="25.5" width="93" height="59" rx="2.5" fill="url(#screen)"/>
+  <rect x="38" y="98" width="52" height="7" rx="3.5" fill="#fff"/>
+  <path d="M38.5 41h22v6.6h-7.7V70h-6.6V47.6h-7.7z" fill="#fff"/>
+  <path d="M63.5 41h7.1l5.9 20.2L82.4 41h7.1l-9.4 29h-7.2z" fill="#fff"/>
 </svg>
