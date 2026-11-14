@@ -46,12 +46,11 @@ export async function generateVectorAssets() {
         'now-tv',
         'joyn',
         'waipu-tv',
-        'zattoo',
         'skyshowtime',
         'movistar-plus',
         'nrk-tv',
       ].includes(name),
-      light_ink: expanded && !['live-tv', 'browser'].includes(name),
+      light_ink: expanded && !['live-tv', 'browser', 'zattoo'].includes(name),
       trim: expanded,
       reference_size: 1536,
     });

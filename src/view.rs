@@ -2610,10 +2610,10 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
         }
         WIDGETS_SECTION => {
             for (index, (widget, key, icon)) in [
-                (0, "greeting", "type"),
                 (1, "weather", "weather-sun"),
                 (2, "shortcuts", "sparkles"),
                 (3, "inputs", "input-hdmi"),
+                (0, "greeting", "type"),
             ]
             .into_iter()
             .enumerate()

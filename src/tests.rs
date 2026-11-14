@@ -1555,8 +1555,6 @@ fn weather_location_keyboard_back_and_sidebar_routes_restore_focus() {
     state.focus = Target::Sidebar(crate::state::WIDGETS_SECTION);
     state.section = crate::state::WIDGETS_SECTION;
     state.activate();
-    assert_eq!(state.focus, Target::Widget(0));
-    state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Widget(1));
     state.activate();
     assert_eq!(state.focus, Target::WeatherToggle);
@@ -2411,7 +2409,7 @@ fn widgets_group_existing_settings_and_restore_each_parent_without_changing_pref
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Sidebar(WIDGETS_SECTION));
     state.direction(Direction::Right, &controls(&state));
-    assert_eq!(state.focus, Target::Widget(0));
+    assert_eq!(state.focus, Target::Widget(1));
     let widget_order: Vec<_> = controls(&state)
         .into_iter()
         .filter_map(|control| match control.target {
@@ -2419,7 +2417,7 @@ fn widgets_group_existing_settings_and_restore_each_parent_without_changing_pref
             _ => None,
         })
         .collect();
-    assert_eq!(widget_order, [0, 1, 2, 3]);
+    assert_eq!(widget_order, [1, 2, 3, 0]);
     for (index, subpage) in [
         Subpage::Greeting,
         Subpage::Weather,

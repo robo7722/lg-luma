@@ -6,6 +6,10 @@
 
 - Show a time-of-day greeting on Home again (Settings → Widgets → Greeting) and add an evening mode in Settings → General that dims the background and glass surfaces from a chosen hour until 06:00.
 
+### Patch Changes
+
+- Show Zattoo with a colourful original TV icon instead of its monochrome wordmark, and use the Plex logo for the PlxNative app (`com.beb.plxnative`).
+
 ## 3.2.1
 
 ### Patch Changes

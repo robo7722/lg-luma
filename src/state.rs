@@ -1215,7 +1215,7 @@ impl State {
                     })
                     .unwrap_or(0),
             ),
-            WIDGETS_SECTION => Target::Widget(0),
+            WIDGETS_SECTION => Target::Widget(1),
             APPS_SECTION => self
                 .apps()
                 .first()

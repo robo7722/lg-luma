@@ -157,7 +157,7 @@ const surfaces = {
   'rtl-plus': ['#262029', '#121014'],
   joyn: ['#000000', '#000000'],
   'waipu-tv': ['#154e8e', '#0a2544'],
-  zattoo: ['#353031', '#151314'],
+  zattoo: ['#3b2318', '#1b0f0c'],
   skyshowtime: ['#24202e', '#100d17'],
   'coupang-play': ['#143b4a', '#091d25'],
   tving: ['#3f131d', '#1a090e'],

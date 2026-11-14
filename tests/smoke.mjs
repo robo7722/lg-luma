@@ -88,7 +88,12 @@ try {
   const home = await scenario('home', 'home');
   assert.deepEqual(home.focus, { App: 'netflix' });
   assert.ok(!home.ui_text.includes('Favorites'));
-  assert.ok(!home.ui_text.some((value) => value.startsWith('Good evening')));
+  // Home greets by time of day again; the wall clock decides which greeting is shown.
+  assert.ok(
+    home.ui_text.some((value) =>
+      ['Good morning.', 'Good afternoon.', 'Good evening.', 'One more moment.'].includes(value),
+    ),
+  );
   assert.ok(home.render.capture.glass_surfaces >= 3);
   assert.equal(home.render.capture.glass_backdrop_sampling, true);
   const fallback = await scenario('glass-fallback', 'home', [], 90, { LUMA_GLASS: '0' });
@@ -368,9 +373,8 @@ try {
   const widgets = await scenario('widgets-settings', widgetsPage);
   assert.deepEqual(widgets.focus, { Widget: 1 });
   assert.ok(widgets.ui_text.includes('Widgets'));
-  for (const title of ['Weather', 'Shortcuts', 'Inputs'])
+  for (const title of ['Weather', 'Shortcuts', 'Inputs', 'Greeting'])
     assert.ok(widgets.ui_text.includes(title));
-  assert.ok(!widgets.ui_text.includes('Greeting'));
   assert.ok(!widgets.ui_text.includes('Date'));
 
   const general = await scenario('general-without-app-names', 'settings,enter');
