@@ -27,12 +27,14 @@ impl Cue {
         Self::Glide,
     ];
 
-    /// Mix level; the glide sits far below the clicks.
+    /// Mix level: all cues at half the clips' level, the glide far below the clicks.
     fn gain(self) -> f32 {
-        match self {
-            Self::Glide => 0.3,
-            _ => 1.,
-        }
+        let master = 0.5;
+        master
+            * match self {
+                Self::Glide => 0.3,
+                _ => 1.,
+            }
     }
 
     fn index(self) -> usize {
@@ -236,6 +238,8 @@ mod tests {
                 .fold(0., f32::max)
         };
         assert!(peak(Cue::Glide) < peak(Cue::Focus) * 0.6);
+        // Every cue plays at half the level of its bundled clip.
+        assert_eq!(Cue::Focus.gain(), 0.5);
     }
 
     #[test]

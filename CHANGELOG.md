@@ -1,5 +1,18 @@
 # lg-luma
 
+## 3.6.0
+
+### Minor Changes
+
+- Liquid Glass focus: the focus flows between cards like a drop of liquid, stretching along its path and springing into place, in the dock, the app drawer and the background gallery, with the remote and the Magic Remote pointer.
+- The focused card rises and grows slightly on a glass lens with a soft shadow, framed by a clear glass rim lit like a curved glass edge, and the card focus left settles back down. Reduce motion keeps cards still.
+
+## 3.5.1
+
+### Patch Changes
+
+- Play all UI sounds at half their previous volume.
+
 ## 3.5.0
 
 ### Minor Changes

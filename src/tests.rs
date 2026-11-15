@@ -3767,3 +3767,103 @@ fn section_glides_get_a_faint_cue_unless_sounds_or_motion_are_off() {
     state.section_cue();
     assert!(state.cues.is_empty());
 }
+
+#[test]
+fn the_focus_lens_flows_like_a_drop_and_lands_exactly() {
+    use crate::state::{Rect, liquid_glide};
+    let from = Rect::new(100., 820., 270., 154.4);
+    let to = Rect::new(396.4, 820., 270., 154.4);
+    let start = liquid_glide(from, to, 0.);
+    assert!((start.x - from.x).abs() < 1e-3 && (start.w - from.w).abs() < 1e-3);
+    // Mid-flight the leading edge is ahead of the trailing one: the drop stretches along its
+    // path and thins across it.
+    let mid = liquid_glide(from, to, 0.35);
+    assert!(mid.w > from.w * 1.2, "{mid:?}");
+    assert!(mid.h < from.h, "{mid:?}");
+    assert!(mid.x < to.x && mid.x + mid.w > to.x + to.w - 1.);
+    // Moving left mirrors it: the left edge leads.
+    let back = liquid_glide(to, from, 0.35);
+    assert!((back.x - (from.x + to.x + to.w - mid.x - mid.w)).abs() < 1e-3);
+    let end = liquid_glide(from, to, 1.);
+    assert!((end.x - to.x).abs() < 1e-3 && (end.w - to.w).abs() < 1e-3);
+    assert!((end.h - to.h).abs() < 1e-3);
+}
+
+#[test]
+fn focused_cards_rise_and_grow_and_the_old_card_settles() {
+    use crate::state::{FOCUS_GLIDE, FOCUS_LIFT, FOCUS_SCALE, Rect, raised};
+    let mut state = ready();
+    let old = Target::App("old".into());
+    state.focus = Target::App("new".into());
+    // Scripted captures (no focus timing) stay flat but keep the focused shadow.
+    assert_eq!(state.card_raise(&state.focus.clone()), 1.);
+    assert_eq!(state.card_lift(&old), 0.);
+    let now = std::time::Instant::now();
+    state.focus_lifted = Some(now);
+    state.focus_left = Some((old.clone(), now));
+    assert!(state.card_lift(&old) > FOCUS_LIFT * 0.9);
+    assert!(state.focus_lift() < 1.);
+    assert!(state.animating());
+    let settled = now - std::time::Duration::from_secs_f32(FOCUS_GLIDE + 0.05);
+    state.focus_lifted = Some(settled);
+    state.focus_left = Some((old.clone(), settled));
+    assert!(state.card_lift(&old).abs() < 1e-3);
+    assert!((state.focus_lift() - FOCUS_LIFT).abs() < 1e-3);
+    // A raised card grows around its centre and moves up by the lift.
+    let card = Rect::new(100., 820., 270., 154.4);
+    let shown = raised(card, FOCUS_LIFT);
+    assert!((shown.w - card.w * (1. + FOCUS_SCALE)).abs() < 1e-3);
+    assert!((shown.center().0 - card.center().0).abs() < 1e-3);
+    assert!((shown.center().1 - (card.center().1 - FOCUS_LIFT)).abs() < 1e-3);
+    // The glass lens crossfades: it builds under the new card while it fades under the old.
+    let now = std::time::Instant::now();
+    state.focus_lifted = Some(now);
+    state.focus_left = Some((old.clone(), now));
+    assert!(state.lens_fade(&state.focus.clone()) < 0.05);
+    assert!(state.lens_fade(&old) > 0.95);
+    let half = now - std::time::Duration::from_secs_f32(crate::state::LENS_FADE / 2.);
+    state.focus_lifted = Some(half);
+    state.focus_left = Some((old.clone(), half));
+    let sum = state.lens_fade(&state.focus.clone()) + state.lens_fade(&old);
+    assert!((sum - 1.).abs() < 1e-3 && state.lens_fade(&old) > 0.2);
+    assert!(state.animating());
+    // Reduced motion: no rise, and the old card is simply at rest.
+    state.preferences.reduced_motion = true;
+    state.focus_lifted = Some(now);
+    assert_eq!(state.focus_lift(), 0.);
+    assert_eq!(state.card_raise(&old), 0.);
+    assert_eq!(state.lens_fade(&old), 0.);
+    assert_eq!(state.lens_fade(&state.focus.clone()), 1.);
+}
+
+#[test]
+fn the_focus_ring_glides_between_cards_and_the_card_lifts() {
+    use crate::state::{FOCUS_GLIDE, FOCUS_LIFT, Rect};
+    let mut state = ready();
+    let to = Rect::new(400., 820., 270., 154.4);
+    assert!(state.focus_glide(to).is_none());
+    assert_eq!(state.focus_lift(), 0.);
+    let now = std::time::Instant::now();
+    state.focus_from = Some((Rect::new(100., 820., 270., 154.4), now));
+    state.focus_lifted = Some(now);
+    // Just started: the ring is still near where it was and the card has not risen.
+    let ring = state.focus_glide(to).unwrap();
+    assert!(ring.x < 150.);
+    assert!(state.focus_lift() < 1.);
+    assert!(state.animating());
+    // Settled: the ring sits on the card and the card is fully raised.
+    let past = now - std::time::Duration::from_secs_f32(FOCUS_GLIDE * 2.);
+    state.focus_from = Some((Rect::new(100., 820., 270., 154.4), past));
+    state.focus_lifted = Some(past);
+    assert!(state.focus_glide(to).is_none());
+    assert!((state.focus_lift() - FOCUS_LIFT).abs() < 1e-3);
+    state.dirty = false;
+    state.tick();
+    assert!(state.focus_from.is_none());
+    assert!(state.dirty);
+    // The Magic Remote pointer lifts cards too; reduced motion keeps everything still.
+    state.pointer = true;
+    assert!((state.focus_lift() - FOCUS_LIFT).abs() < 1e-3);
+    state.preferences.reduced_motion = true;
+    assert_eq!(state.focus_lift(), 0.);
+}

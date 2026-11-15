@@ -189,6 +189,14 @@ pub struct Scene {
     pub draw: Vec<Draw>,
     pub controls: Vec<Control>,
     pub modal: Option<Rect>,
+    /// A focus ring that is gliding between cards, drawn above the page so neighbours
+    /// never cover it.
+    gliding_ring: Option<(Rect, f32)>,
+    /// Glass lenses (rect, radius, opacity) under the focused card and the card focus just
+    /// left, placed behind their row by `place_lens`.
+    lens: Vec<(Rect, f32, f32)>,
+    /// Where the focus ring was drawn, so the next glide flows on from there.
+    pub focus_rect: Option<Rect>,
 }
 impl Scene {
     fn glass(&mut self, rect: Rect, radius: f32) {
@@ -199,6 +207,9 @@ impl Scene {
             draw: Vec::new(),
             controls: Vec::new(),
             modal: None,
+            gliding_ring: None,
+            lens: Vec::new(),
+            focus_rect: None,
         }
     }
     fn shape(&mut self, rect: Rect, radius: f32, fill: Color) {
@@ -241,9 +252,32 @@ impl Scene {
             scrollable,
         });
     }
+    /// The focus ring: a clear glass rim around the card, lit like a curved glass edge.
     fn ring(&mut self, rect: Rect, radius: f32) {
-        self.border(rect.inset(-6.9), radius + 6.9, 3.7, c(0xffffff, 0.10));
-        self.border(rect.inset(-3.2), radius + 3.2, 3.2, c(0xf0f0f0, 1.));
+        self.draw
+            .push(Draw::Rim(rect.inset(-8.), radius + 8., 7.5, 1.));
+    }
+    /// Glass lenses around the focused card and the card focus left, inserted at `at` so they
+    /// lie under every card of the row.
+    fn place_lens(&mut self, at: usize) {
+        let lenses = std::mem::take(&mut self.lens)
+            .into_iter()
+            .flat_map(|(rect, radius, alpha)| {
+                let outer = rect.inset(-14.);
+                let radius = radius + 14.;
+                [
+                    Draw::Shadow(
+                        Rect::new(outer.x, outer.y + 10., outer.w, outer.h),
+                        radius,
+                        26.,
+                        c(0, 0.22 * alpha),
+                    ),
+                    Draw::Glass(outer, radius, c(0x787878, 0.94 * alpha)),
+                    Draw::Shape(outer, radius, 0., c(0xffffff, 0.07 * alpha)),
+                ]
+            })
+            .collect::<Vec<_>>();
+        self.draw.splice(at..at, lenses);
     }
     fn shadow(&mut self, rect: Rect, radius: f32, blur: f32, y: f32, alpha: f32) {
         self.draw.push(Draw::Shadow(
@@ -285,10 +319,42 @@ impl Scene {
                 | Draw::Image(_, rect, ..)
                 | Draw::TintedImage(_, rect, ..)
                 | Draw::AppImage(_, rect, ..)
+                | Draw::Rim(rect, ..)
                 | Draw::Clip(Some(rect)) => shift(rect),
                 Draw::EdgeFade(Some(edges)) => edges.iter_mut().for_each(|y| *y += dy),
                 Draw::EdgeFadeX(Some(edges)) => edges.iter_mut().for_each(|x| *x += dx),
                 Draw::Clip(None) | Draw::EdgeFade(None) | Draw::EdgeFadeX(None) => {}
+            }
+        }
+    }
+
+    /// Grows draws from `from` by `k` around `centre`; hit targets stay put. Text keeps its
+    /// size, since glyphs are cached per size, and only moves with its card.
+    fn scale(&mut self, from: usize, k: f32, (cx, cy): (f32, f32)) {
+        if k == 1. {
+            return;
+        }
+        let scale = |rect: &mut Rect| {
+            rect.x = cx + (rect.x - cx) * k;
+            rect.y = cy + (rect.y - cy) * k;
+            rect.w *= k;
+            rect.h *= k;
+        };
+        for draw in &mut self.draw[from..] {
+            match draw {
+                Draw::Glass(rect, radius, ..)
+                | Draw::Shape(rect, radius, ..)
+                | Draw::RoundedGradient(rect, radius, ..)
+                | Draw::Shadow(rect, radius, ..)
+                | Draw::Image(_, rect, radius, ..)
+                | Draw::TintedImage(_, rect, radius, ..)
+                | Draw::AppImage(_, rect, radius, ..)
+                | Draw::Rim(rect, radius, ..) => {
+                    scale(rect);
+                    *radius *= k;
+                }
+                Draw::Text(_, rect, ..) | Draw::Clip(Some(rect)) => scale(rect),
+                Draw::Clip(None) | Draw::EdgeFade(_) | Draw::EdgeFadeX(_) => {}
             }
         }
     }
@@ -370,6 +436,7 @@ fn draw_rect(draw: &Draw) -> Option<Rect> {
         | Draw::Image(_, rect, ..)
         | Draw::TintedImage(_, rect, ..)
         | Draw::AppImage(_, rect, ..)
+        | Draw::Rim(rect, ..)
         | Draw::Clip(Some(rect)) => Some(*rect),
         _ => None,
     }
@@ -387,6 +454,7 @@ fn animate_draw(draw: &mut Draw, alpha: f32, dx: f32, dy: f32) {
         | Draw::Image(_, rect, ..)
         | Draw::TintedImage(_, rect, ..)
         | Draw::AppImage(_, rect, ..)
+        | Draw::Rim(rect, ..)
         | Draw::Clip(Some(rect)) => {
             rect.x += dx;
             rect.y += dy;
@@ -415,6 +483,7 @@ fn fade_draw(draw: &mut Draw, alpha: f32, brightness: f32) {
             apply(a);
             apply(b);
         }
+        Draw::Rim(.., opacity) => *opacity *= alpha,
         Draw::Image(path, rect, radius, contain) => {
             *draw = Draw::TintedImage(
                 path.clone(),
@@ -748,6 +817,17 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
     );
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
+    if let Some((ring, radius)) = out.gliding_ring.take() {
+        // A faint clear drop: cards it passes over brighten slightly as if seen through glass,
+        // swelling in and out with the glide.
+        let t = state.focus_glide_progress().unwrap_or(1.);
+        out.shape(
+            ring,
+            radius,
+            c(0xffffff, 0.05 * (std::f32::consts::PI * t).sin()),
+        );
+        out.ring(ring, radius);
+    }
     header(&mut out, state, assets, now);
     if matches!(state.overlay, Some(Overlay::Inputs | Overlay::Settings)) {
         let start = out.draw.len();
@@ -1114,12 +1194,13 @@ fn tile(out: &mut Scene, state: &State, assets: &Assets, app: &App, rect: Rect, 
     }
     let start = out.draw.len();
     let focused = state.focus == target;
+    let raise = state.card_raise(&target);
     out.shadow(
         rect,
         19.2,
-        if focused { 34. } else { 22. },
-        if focused { 14. } else { 9. },
-        if focused { 0.4 } else { 0.165 },
+        22. + 12. * raise,
+        9. + 5. * raise,
+        0.165 + 0.235 * raise,
     );
     let favorite_color = app_face(out, assets, app, rect, state.preferences.language, 19.2);
     if !dock
@@ -1151,8 +1232,30 @@ fn tile(out: &mut Scene, state: &State, assets: &Assets, app: &App, rect: Rect, 
             c(0xededed, 1.),
         );
     }
+    // The focused card rises and grows a little on a spring and the card focus left settles
+    // back; only the drawing moves, its hit target stays put.
+    let lift = state.card_lift(&target);
+    if lift != 0. {
+        out.scale(
+            start,
+            1. + crate::state::FOCUS_SCALE * lift / crate::state::FOCUS_LIFT,
+            rect.center(),
+        );
+        out.shift(start, 0., -lift);
+    }
+    let shown = crate::state::raised(rect, lift);
+    let radius = 19.2 * shown.w / rect.w;
+    let lens = state.lens_fade(&target);
+    if lens > 0. {
+        out.lens.push((shown, radius, lens));
+    }
     if focused {
-        out.ring(rect, 19.2);
+        let glide = state.focus_glide(shown);
+        out.focus_rect = Some(glide.unwrap_or(shown));
+        match glide {
+            Some(ring) => out.gliding_ring = Some((ring, radius)),
+            None => out.ring(shown, radius),
+        }
     }
     if state.pressed.as_ref() == Some(&target) {
         out.fade(start, 1., 0.85);
@@ -1474,6 +1577,7 @@ fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
         HOME_STRIP_RIGHT,
         HOME_FADE_RIGHT,
     ])));
+    let cards = out.draw.len();
     for (index, app) in apps.iter().enumerate() {
         tile(
             out,
@@ -1489,6 +1593,7 @@ fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
             true,
         );
     }
+    out.place_lens(cards);
     out.draw.push(Draw::EdgeFadeX(None));
     out.draw.push(Draw::Clip(Some(state.content_viewport())));
 }
@@ -1782,6 +1887,7 @@ fn library_grid(out: &mut Scene, state: &State, assets: &Assets) {
     out.draw.push(Draw::Clip(Some(state.apps_viewport())));
     let offset = state.dock_y() - 164.8;
     let mut y = state.drawer_grid_top();
+    let cards = out.draw.len();
     for row in apps.chunks(APPS_COLUMNS) {
         let row_height = FACE_HEIGHT;
         for (column, app) in row.iter().enumerate() {
@@ -1805,6 +1911,7 @@ fn library_grid(out: &mut Scene, state: &State, assets: &Assets) {
         }
         y += row_height + 38.4;
     }
+    out.place_lens(cards);
     out.draw.push(Draw::Clip(None));
 }
 
@@ -2620,6 +2727,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 .push(Draw::Clip(Some(state.app_settings_viewport())));
             let apps = state.apps();
             let mut y = 164.8;
+            let cards = out.draw.len();
             for row in apps.chunks(3) {
                 for (column, app) in row.iter().enumerate() {
                     let rect = Rect::new(640. + column as f32 * 380., y - s, 360., 202.5);
@@ -2632,6 +2740,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 }
                 y += 226.5;
             }
+            out.place_lens(cards);
             out.draw.push(Draw::Clip(None));
         }
         0 => {
@@ -2824,7 +2933,12 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                     out.icon(assets, "check", check.inset(3.6), c(0x333333, 1.));
                 }
                 if state.focus == Target::Background(index) {
-                    out.ring(rect, 16.);
+                    let glide = state.focus_glide(rect);
+                    out.focus_rect = Some(glide.unwrap_or(rect));
+                    match glide {
+                        Some(ring) => out.gliding_ring = Some((ring, 16.)),
+                        None => out.ring(rect, 16.),
+                    }
                 }
                 out.control(Target::Background(index), rect, true);
             }

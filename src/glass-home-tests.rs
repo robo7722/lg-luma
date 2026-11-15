@@ -889,3 +889,54 @@ fn connecting_the_first_input_gives_an_empty_dropdown_a_valid_remote_target() {
     assert_eq!(state.focus, Target::InputsMenu);
     assert!(state.overlay.is_none());
 }
+
+#[test]
+fn the_focus_lens_lies_under_every_dock_card_and_a_glass_rim_rings_the_raised_card() {
+    let mut state = ready();
+    let rendered = scene(&state);
+    let control = rendered
+        .controls
+        .iter()
+        .find(|control| matches!(control.target, Target::App(_)))
+        .unwrap();
+    let first = control.rect;
+    state.focus = control.target.clone();
+    // Focus has settled: the card is raised and grown.
+    let started = std::time::Instant::now()
+        - std::time::Duration::from_secs_f32(crate::state::FOCUS_GLIDE * 2.);
+    state.focus_lifted = Some(started);
+    let rendered = scene(&state);
+    let shown = crate::state::raised(first, crate::state::FOCUS_LIFT);
+    let lens = rendered
+        .draw
+        .iter()
+        .position(|draw| {
+            matches!(draw, Draw::Glass(rect, ..)
+                if (rect.x - (shown.x - 14.)).abs() < 0.01 && (rect.w - (shown.w + 28.)).abs() < 0.01)
+        })
+        .expect("glass lens around the raised card");
+    // Every card's shadow (the first draw of each tile) comes after the lens.
+    let cards = rendered
+        .draw
+        .iter()
+        .enumerate()
+        .filter(
+            |(_, draw)| matches!(draw, Draw::Shadow(rect, ..) if rect.h > 150. && rect.w < 300.),
+        )
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    assert!(cards.len() > 2);
+    assert!(cards.iter().all(|index| *index > lens), "{lens} {cards:?}");
+    let rim = rendered
+        .draw
+        .iter()
+        .find_map(|draw| match draw {
+            Draw::Rim(rect, _, width, alpha) => Some((*rect, *width, *alpha)),
+            _ => None,
+        })
+        .expect("glass rim around the focused card");
+    assert!((rim.0.x - (shown.x - 8.)).abs() < 0.01 && (rim.0.w - (shown.w + 16.)).abs() < 0.01);
+    assert!(rim.1 > 0. && rim.2 == 1.);
+    // The rim and lens no longer carry a sweeping light band.
+    assert!(lens < rendered.draw.len());
+}

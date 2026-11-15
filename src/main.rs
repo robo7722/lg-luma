@@ -944,6 +944,10 @@ fn run() -> Result<(), String> {
     let mut back_button = BackButton::default();
     let mut last_minute = None;
     let mut shown_page = state.page;
+    let mut shown_focus = state.focus.clone();
+    // Where the focus ring was on the last presented frame; event handling may recompose
+    // the scene for the new focus before the glide starts.
+    let mut shown_focus_rect = None;
     let mut shown_section = state.section;
     // Motion that started this frame restarts once the frame is on screen: the TV can take
     // longer than the whole animation to lay out a page it has not drawn before.
@@ -1771,6 +1775,32 @@ fn run() -> Result<(), String> {
             restart_motion |= state.panel_started.is_some();
             seen_panel = state.panel_started;
         }
+        // Focus moving between cards (remote or Magic Remote pointer): the ring glides from
+        // where it was drawn and the new card lifts. Scripted captures stay still.
+        if state.focus != shown_focus {
+            let from = scene
+                .controls
+                .iter()
+                .find(|control| control.target == shown_focus)
+                .map(|control| control.rect);
+            if options.script.is_empty()
+                && state::ring_target(&state.focus)
+                && state::ring_target(&shown_focus)
+                && let Some(from) = from
+            {
+                // Flow on from where the ring was drawn, even mid-glide.
+                let from =
+                    shown_focus_rect.unwrap_or_else(|| state::raised(from, state.focus_lift()));
+                state.focus_from = Some((from, Instant::now()));
+            } else {
+                state.focus_from = None;
+            }
+            let now = options.script.is_empty().then(Instant::now);
+            state.focus_lifted = now;
+            state.focus_left = now.map(|now| (shown_focus.clone(), now));
+            state.dirty = true;
+            shown_focus = state.focus.clone();
+        }
         for cue in state.cues.drain(..) {
             sounds.play(cue);
         }
@@ -1782,6 +1812,7 @@ fn run() -> Result<(), String> {
         if ((state.dirty || options.profile_frames.is_some()) && visible) || final_frame {
             let compose_started = Instant::now();
             scene = compose(&mut state, &assets, now);
+            shown_focus_rect = scene.focus_rect;
             let compose_ms = compose_started.elapsed().as_secs_f64() * 1000.;
             let (width, height) = window.drawable_size();
             if width > 0 && height > 0 {

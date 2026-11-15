@@ -45,6 +45,36 @@ void main() {
         gl_FragColor = color * vec4(1.0, 1.0, 1.0, edge_coverage());
         return;
     }
+    if (v_params.y < -2999.0) {
+        // Glass rim: a clear rounded bead around the box. A bright crest runs near its outer
+        // edge, strongest where the edge faces the light (upper left) with a weaker bounce
+        // opposite; between them it stays faintly milky, and a fine shadow line separates it
+        // from what it surrounds.
+        vec2 half_box = v_shape.zw;
+        float r = min(v_params.x, min(half_box.x, half_box.y));
+        vec2 k = abs(v_shape.xy) - half_box + vec2(r);
+        float edge = length(max(k, vec2(0.0))) + min(max(k.x, k.y), 0.0) - r;
+        float width = max(v_color.r, 1.0);
+        float coverage = clamp(0.5 - edge / u_aa, 0.0, 1.0) *
+            clamp(0.5 + (edge + width) / u_aa, 0.0, 1.0);
+        float t = clamp(-edge / width, 0.0, 1.0);
+        vec2 outside = max(k, vec2(0.0));
+        vec2 axis = k.x > k.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+        vec2 normal = sign(v_shape.xy) * (max(k.x, k.y) > 0.0
+            ? outside / max(length(outside), 0.0001) : axis);
+        float facing = dot(normal, normalize(vec2(-0.55, -1.0)));
+        float key = max(facing, 0.0);
+        key *= key * key;
+        float bounce = max(-facing, 0.0);
+        bounce *= bounce * bounce * bounce;
+        float c = (t - 0.3) / 0.2;
+        float crest = exp(-c * c);
+        float light = 0.3 + 0.7 * key + 0.55 * bounce;
+        float dark = smoothstep(0.72, 1.0, t);
+        float alpha = mix(0.16 + 0.84 * crest * light, 0.32, dark);
+        gl_FragColor = vec4(vec3(1.0 - dark), alpha * coverage * v_color.a * edge_coverage());
+        return;
+    }
     bool glass = v_params.y < -999.0;
     float blur = glass ? 0.0 : max(-v_params.y, 0.0);
     vec2 half_size = v_shape.zw - vec2(blur);

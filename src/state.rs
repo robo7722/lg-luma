@@ -36,6 +36,69 @@ pub const BACKGROUND_FADE: f32 = 0.4;
 pub const PAGE_TRANSITION: f32 = 0.56;
 pub const POPUP_TRANSITION: f32 = 0.34;
 pub const SECTION_TRANSITION: f32 = 0.42;
+/// Seconds for the focus lens to glide between cards and for a card to lift.
+pub const FOCUS_GLIDE: f32 = 0.3;
+/// Seconds for the glass lens to fade from the card focus left to the one it reached, so
+/// the glass behind them never appears or vanishes in one frame.
+pub const LENS_FADE: f32 = 0.42;
+/// How far a focused card rises, in logical pixels.
+pub const FOCUS_LIFT: f32 = 8.;
+/// How much a focused card grows once fully raised (5 %).
+pub const FOCUS_SCALE: f32 = 0.05;
+
+/// Where a card is drawn when raised by `lift`: grown around its centre and moved up.
+pub fn raised(rect: Rect, lift: f32) -> Rect {
+    if lift == 0. {
+        return rect;
+    }
+    let k = 1. + FOCUS_SCALE * lift / FOCUS_LIFT;
+    let (cx, cy) = rect.center();
+    Rect::new(
+        cx - rect.w * k / 2.,
+        cy - rect.h * k / 2. - lift,
+        rect.w * k,
+        rect.h * k,
+    )
+}
+
+/// The focus lens between two cards at progress `t`, moving like a drop of liquid: the
+/// leading edge races ahead and springs past the target, the trailing edge lets go late, and
+/// while stretched along its path the drop thins across it.
+pub fn liquid_glide(from: Rect, to: Rect, t: f32) -> Rect {
+    let lead = spring(t / 0.7);
+    let trail = spring((t - 0.18) / 0.82);
+    let axis = |a0: f32, a1: f32, b0: f32, b1: f32| {
+        let (start, end) = if b0 + b1 >= a0 + a1 {
+            (trail, lead)
+        } else {
+            (lead, trail)
+        };
+        (a0 + (b0 - a0) * start, a1 + (b1 - a1) * end)
+    };
+    let (x0, x1) = axis(from.x, from.x + from.w, to.x, to.x + to.w);
+    let (y0, y1) = axis(from.y, from.y + from.h, to.y, to.y + to.h);
+    let k = spring(t);
+    let plain_w = (from.w + (to.w - from.w) * k).max(1.);
+    let plain_h = (from.h + (to.h - from.h) * k).max(1.);
+    let stretch_x = ((x1 - x0) / plain_w - 1.).max(0.);
+    let stretch_y = ((y1 - y0) / plain_h - 1.).max(0.);
+    let thin_y = (y1 - y0) * (stretch_x * 0.25).min(0.12) / 2.;
+    let thin_x = (x1 - x0) * (stretch_y * 0.25).min(0.12) / 2.;
+    Rect::new(
+        x0 + thin_x,
+        y0 + thin_y,
+        x1 - x0 - 2. * thin_x,
+        y1 - y0 - 2. * thin_y,
+    )
+}
+
+/// Cards with a ring-style focus, whose ring glides and whose face lifts.
+pub fn ring_target(target: &Target) -> bool {
+    matches!(
+        target,
+        Target::App(_) | Target::DockApp(_) | Target::Background(_)
+    )
+}
 
 /// Cubic ease-out: quick start, soft landing, like a glass sheet settling.
 pub fn ease_out(t: f32) -> f32 {
@@ -283,6 +346,12 @@ pub struct State {
     pub panel_started: Option<Instant>,
     /// Start of the glide between Home/Apps and Settings, set by the event loop.
     pub page_started: Option<Instant>,
+    /// Remote focus moving between cards: the ring's previous rect and when it left.
+    pub focus_from: Option<(Rect, Instant)>,
+    /// When the focused card started lifting.
+    pub focus_lifted: Option<Instant>,
+    /// The card focus just left, settling back down, and when it left.
+    pub focus_left: Option<(Target, Instant)>,
     /// UI click cues to play this frame, drained by the event loop.
     pub cues: Vec<crate::audio::Cue>,
     /// Start of the glide between Settings sections, set by the event loop.
@@ -336,6 +405,9 @@ impl State {
             update: crate::update::InstallStatus::default(),
             panel_started: None,
             page_started: None,
+            focus_from: None,
+            focus_lifted: None,
+            focus_left: None,
             cues: Vec::new(),
             section_started: None,
             weather: weather::Weather::default(),
@@ -461,6 +533,19 @@ impl State {
                 self.panel_started = None;
             }
         }
+        // The focus glide and lift redraw while they move, then the glide ends.
+        let focus_moving = |started: Instant| started.elapsed().as_secs_f32() < FOCUS_GLIDE;
+        let gliding = self
+            .focus_from
+            .is_some_and(|(_, started)| focus_moving(started));
+        if !gliding && self.focus_from.take().is_some() {
+            // One last frame draws the ring at rest on the new card.
+            self.dirty = true;
+        }
+        let lens_fading = |started: Instant| started.elapsed().as_secs_f32() < LENS_FADE;
+        if gliding || self.focus_lifted.is_some_and(lens_fading) {
+            self.dirty = true;
+        }
         // Page and section glides redraw every frame while they run, plus once at rest.
         for (started, duration) in [
             (&mut self.page_started, PAGE_TRANSITION),
@@ -562,6 +647,82 @@ impl State {
         (t < 1.).then(|| ease_out(t))
     }
 
+    /// The focus lens while it flows from the previous card to `to` like a drop of liquid.
+    pub fn focus_glide(&self, to: Rect) -> Option<Rect> {
+        if self.preferences.reduced_motion {
+            return None;
+        }
+        let (from, started) = self.focus_from?;
+        let t = started.elapsed().as_secs_f32() / FOCUS_GLIDE;
+        (t < 1.).then(|| liquid_glide(from, to, t))
+    }
+
+    /// Progress (0..1) of a running focus glide.
+    pub fn focus_glide_progress(&self) -> Option<f32> {
+        if self.preferences.reduced_motion {
+            return None;
+        }
+        let (_, started) = self.focus_from?;
+        let t = started.elapsed().as_secs_f32() / FOCUS_GLIDE;
+        (t < 1.).then_some(t)
+    }
+
+    /// Opacity of the glass lens under a card: fading in under the focused card and out under
+    /// the card focus just left, crossing smoothly so the glass never jumps.
+    pub fn lens_fade(&self, target: &Target) -> f32 {
+        let fade = |started: Instant| {
+            let t = (started.elapsed().as_secs_f32() / LENS_FADE).clamp(0., 1.);
+            t * t * (3. - 2. * t)
+        };
+        let motion = !self.preferences.reduced_motion;
+        if *target == self.focus {
+            match self.focus_lifted {
+                Some(started) if motion => fade(started),
+                _ => 1.,
+            }
+        } else {
+            match &self.focus_left {
+                Some((left, started)) if motion && left == target => 1. - fade(*started),
+                _ => 0.,
+            }
+        }
+    }
+
+    /// How raised a card looks, 0 at rest and 1 when focused (springing a little past it
+    /// while focus arrives). The card focus just left settles back down.
+    pub fn card_raise(&self, target: &Target) -> f32 {
+        let progress = |started: Instant| started.elapsed().as_secs_f32() / FOCUS_GLIDE;
+        let motion = !self.preferences.reduced_motion;
+        if *target == self.focus {
+            match self.focus_lifted {
+                Some(started) if motion => spring(progress(started)),
+                _ => 1.,
+            }
+        } else {
+            match &self.focus_left {
+                Some((left, started)) if motion && left == target => {
+                    1. - ease_out(progress(*started))
+                }
+                _ => 0.,
+            }
+        }
+    }
+
+    /// How far a card is raised (remote or Magic Remote pointer); nothing with reduced
+    /// motion, while moving an app, or in scripted captures. Only the drawing rises and
+    /// grows: the hit target stays where it was.
+    pub fn card_lift(&self, target: &Target) -> f32 {
+        if self.preferences.reduced_motion || self.moving.is_some() || self.focus_lifted.is_none() {
+            return 0.;
+        }
+        FOCUS_LIFT * self.card_raise(target)
+    }
+
+    /// How far the focused card is raised.
+    pub fn focus_lift(&self) -> f32 {
+        self.card_lift(&self.focus)
+    }
+
     /// Start of a running page glide, unless motion is reduced.
     pub fn page_glide(&self) -> Option<Instant> {
         self.page_started.filter(|started| {
@@ -577,7 +738,11 @@ impl State {
     }
 
     pub fn animating(&self) -> bool {
-        self.page_transition().is_some()
+        self.focus_from.is_some()
+            || self
+                .focus_lifted
+                .is_some_and(|started| started.elapsed().as_secs_f32() < LENS_FADE)
+            || self.page_transition().is_some()
             || self.section_glide().is_some()
             || (self.drawer_visibility != if self.page == Page::Apps { 1. } else { 0. })
             || (!self.preferences.reduced_motion
