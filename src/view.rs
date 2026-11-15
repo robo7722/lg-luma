@@ -192,8 +192,9 @@ pub struct Scene {
     /// A focus ring that is gliding between cards, drawn above the page so neighbours
     /// never cover it.
     gliding_ring: Option<(Rect, f32)>,
-    /// The glass lens under the focused card, placed behind its row by `place_lens`.
-    lens: Option<(Rect, f32)>,
+    /// Glass lenses (rect, radius, opacity) under the focused card and the card focus just
+    /// left, placed behind their row by `place_lens`.
+    lens: Vec<(Rect, f32, f32)>,
     /// Where the focus ring was drawn, so the next glide flows on from there.
     pub focus_rect: Option<Rect>,
 }
@@ -207,7 +208,7 @@ impl Scene {
             controls: Vec::new(),
             modal: None,
             gliding_ring: None,
-            lens: None,
+            lens: Vec::new(),
             focus_rect: None,
         }
     }
@@ -256,25 +257,27 @@ impl Scene {
         self.draw
             .push(Draw::Rim(rect.inset(-8.), radius + 8., 7.5, 1.));
     }
-    /// A glass lens around the focused card, inserted at `at` so it lies under every card
-    /// of the row and glides beneath its neighbours.
+    /// Glass lenses around the focused card and the card focus left, inserted at `at` so they
+    /// lie under every card of the row.
     fn place_lens(&mut self, at: usize) {
-        let Some((rect, radius)) = self.lens.take() else {
-            return;
-        };
-        let outer = rect.inset(-14.);
-        let radius = radius + 14.;
-        let lens = [
-            Draw::Shadow(
-                Rect::new(outer.x, outer.y + 10., outer.w, outer.h),
-                radius,
-                26.,
-                c(0, 0.22),
-            ),
-            Draw::Glass(outer, radius, c(0x787878, 0.94)),
-            Draw::Shape(outer, radius, 0., c(0xffffff, 0.07)),
-        ];
-        self.draw.splice(at..at, lens);
+        let lenses = std::mem::take(&mut self.lens)
+            .into_iter()
+            .flat_map(|(rect, radius, alpha)| {
+                let outer = rect.inset(-14.);
+                let radius = radius + 14.;
+                [
+                    Draw::Shadow(
+                        Rect::new(outer.x, outer.y + 10., outer.w, outer.h),
+                        radius,
+                        26.,
+                        c(0, 0.22 * alpha),
+                    ),
+                    Draw::Glass(outer, radius, c(0x787878, 0.94 * alpha)),
+                    Draw::Shape(outer, radius, 0., c(0xffffff, 0.07 * alpha)),
+                ]
+            })
+            .collect::<Vec<_>>();
+        self.draw.splice(at..at, lenses);
     }
     fn shadow(&mut self, rect: Rect, radius: f32, blur: f32, y: f32, alpha: f32) {
         self.draw.push(Draw::Shadow(
@@ -815,8 +818,14 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
     if let Some((ring, radius)) = out.gliding_ring.take() {
-        // A faint clear drop: cards it passes over brighten slightly as if seen through glass.
-        out.shape(ring, radius, c(0xffffff, 0.05));
+        // A faint clear drop: cards it passes over brighten slightly as if seen through glass,
+        // swelling in and out with the glide.
+        let t = state.focus_glide_progress().unwrap_or(1.);
+        out.shape(
+            ring,
+            radius,
+            c(0xffffff, 0.05 * (std::f32::consts::PI * t).sin()),
+        );
         out.ring(ring, radius);
     }
     header(&mut out, state, assets, now);
@@ -1234,13 +1243,15 @@ fn tile(out: &mut Scene, state: &State, assets: &Assets, app: &App, rect: Rect, 
         );
         out.shift(start, 0., -lift);
     }
+    let shown = crate::state::raised(rect, lift);
+    let radius = 19.2 * shown.w / rect.w;
+    let lens = state.lens_fade(&target);
+    if lens > 0. {
+        out.lens.push((shown, radius, lens));
+    }
     if focused {
-        let shown = crate::state::raised(rect, lift);
-        let radius = 19.2 * shown.w / rect.w;
         let glide = state.focus_glide(shown);
-        let lens = glide.unwrap_or(shown);
-        out.lens = Some((lens, radius));
-        out.focus_rect = Some(lens);
+        out.focus_rect = Some(glide.unwrap_or(shown));
         match glide {
             Some(ring) => out.gliding_ring = Some((ring, radius)),
             None => out.ring(shown, radius),

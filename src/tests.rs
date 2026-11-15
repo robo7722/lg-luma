@@ -3815,11 +3815,25 @@ fn focused_cards_rise_and_grow_and_the_old_card_settles() {
     assert!((shown.w - card.w * (1. + FOCUS_SCALE)).abs() < 1e-3);
     assert!((shown.center().0 - card.center().0).abs() < 1e-3);
     assert!((shown.center().1 - (card.center().1 - FOCUS_LIFT)).abs() < 1e-3);
+    // The glass lens crossfades: it builds under the new card while it fades under the old.
+    let now = std::time::Instant::now();
+    state.focus_lifted = Some(now);
+    state.focus_left = Some((old.clone(), now));
+    assert!(state.lens_fade(&state.focus.clone()) < 0.05);
+    assert!(state.lens_fade(&old) > 0.95);
+    let half = now - std::time::Duration::from_secs_f32(crate::state::LENS_FADE / 2.);
+    state.focus_lifted = Some(half);
+    state.focus_left = Some((old.clone(), half));
+    let sum = state.lens_fade(&state.focus.clone()) + state.lens_fade(&old);
+    assert!((sum - 1.).abs() < 1e-3 && state.lens_fade(&old) > 0.2);
+    assert!(state.animating());
     // Reduced motion: no rise, and the old card is simply at rest.
     state.preferences.reduced_motion = true;
     state.focus_lifted = Some(now);
     assert_eq!(state.focus_lift(), 0.);
     assert_eq!(state.card_raise(&old), 0.);
+    assert_eq!(state.lens_fade(&old), 0.);
+    assert_eq!(state.lens_fade(&state.focus.clone()), 1.);
 }
 
 #[test]

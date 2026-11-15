@@ -38,6 +38,9 @@ pub const POPUP_TRANSITION: f32 = 0.34;
 pub const SECTION_TRANSITION: f32 = 0.42;
 /// Seconds for the focus lens to glide between cards and for a card to lift.
 pub const FOCUS_GLIDE: f32 = 0.3;
+/// Seconds for the glass lens to fade from the card focus left to the one it reached, so
+/// the glass behind them never appears or vanishes in one frame.
+pub const LENS_FADE: f32 = 0.42;
 /// How far a focused card rises, in logical pixels.
 pub const FOCUS_LIFT: f32 = 8.;
 /// How much a focused card grows once fully raised (5 %).
@@ -539,7 +542,8 @@ impl State {
             // One last frame draws the ring at rest on the new card.
             self.dirty = true;
         }
-        if gliding || self.focus_lifted.is_some_and(focus_moving) {
+        let lens_fading = |started: Instant| started.elapsed().as_secs_f32() < LENS_FADE;
+        if gliding || self.focus_lifted.is_some_and(lens_fading) {
             self.dirty = true;
         }
         // Page and section glides redraw every frame while they run, plus once at rest.
@@ -653,6 +657,37 @@ impl State {
         (t < 1.).then(|| liquid_glide(from, to, t))
     }
 
+    /// Progress (0..1) of a running focus glide.
+    pub fn focus_glide_progress(&self) -> Option<f32> {
+        if self.preferences.reduced_motion {
+            return None;
+        }
+        let (_, started) = self.focus_from?;
+        let t = started.elapsed().as_secs_f32() / FOCUS_GLIDE;
+        (t < 1.).then_some(t)
+    }
+
+    /// Opacity of the glass lens under a card: fading in under the focused card and out under
+    /// the card focus just left, crossing smoothly so the glass never jumps.
+    pub fn lens_fade(&self, target: &Target) -> f32 {
+        let fade = |started: Instant| {
+            let t = (started.elapsed().as_secs_f32() / LENS_FADE).clamp(0., 1.);
+            t * t * (3. - 2. * t)
+        };
+        let motion = !self.preferences.reduced_motion;
+        if *target == self.focus {
+            match self.focus_lifted {
+                Some(started) if motion => fade(started),
+                _ => 1.,
+            }
+        } else {
+            match &self.focus_left {
+                Some((left, started)) if motion && left == target => 1. - fade(*started),
+                _ => 0.,
+            }
+        }
+    }
+
     /// How raised a card looks, 0 at rest and 1 when focused (springing a little past it
     /// while focus arrives). The card focus just left settles back down.
     pub fn card_raise(&self, target: &Target) -> f32 {
@@ -706,7 +741,7 @@ impl State {
         self.focus_from.is_some()
             || self
                 .focus_lifted
-                .is_some_and(|started| started.elapsed().as_secs_f32() < FOCUS_GLIDE)
+                .is_some_and(|started| started.elapsed().as_secs_f32() < LENS_FADE)
             || self.page_transition().is_some()
             || self.section_glide().is_some()
             || (self.drawer_visibility != if self.page == Page::Apps { 1. } else { 0. })
