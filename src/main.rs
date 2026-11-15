@@ -718,7 +718,7 @@ fn run() -> Result<(), String> {
 
     let sdl = sdl2::init()?;
     // Scripted desktop captures and tests stay silent; a missing device is never fatal.
-    let sounds = if options.script.is_empty() {
+    let mut sounds = if options.script.is_empty() {
         audio::Sounds::open(&sdl)
     } else {
         audio::Sounds::silent()
@@ -1382,6 +1382,11 @@ fn run() -> Result<(), String> {
                         back_button.cancel();
                     }
                     WindowEvent::Shown | WindowEvent::Restored | WindowEvent::FocusGained => {
+                        // Back from another app (or the audio output changed meanwhile, e.g.
+                        // to a soundbar): reopen the sound output, which may be gone.
+                        if !visible || (!focused && matches!(win_event, WindowEvent::FocusGained)) {
+                            sounds.reconnect(&sdl);
+                        }
                         visible = true;
                         // Shown and Restored can come from SDL itself; only focus confirms.
                         if matches!(win_event, WindowEvent::FocusGained) {
@@ -1398,6 +1403,13 @@ fn run() -> Result<(), String> {
                     | WindowEvent::Exposed => state.dirty = true,
                     _ => {}
                 },
+                // A soundbar or headphones were connected or removed: follow the new output.
+                Event::AudioDeviceAdded {
+                    iscapture: false, ..
+                }
+                | Event::AudioDeviceRemoved {
+                    iscapture: false, ..
+                } => sounds.reconnect(&sdl),
                 Event::TextInput { text, .. } => state.text(&text),
                 Event::TextEditing {
                     text,

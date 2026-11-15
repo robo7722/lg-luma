@@ -132,9 +132,15 @@ impl sdl2::audio::AudioCallback for Mixer {
 }
 
 /// Plays cues on the default output; inert when audio is unavailable.
+///
+/// The output can disappear under the launcher: another app (e.g. a streaming app) takes
+/// the TV's audio while Luma is in the background, or the user switches to a soundbar. The
+/// event loop therefore calls `reconnect` when Luma returns to the foreground or SDL reports
+/// an audio device change, which reopens the default output with the already decoded clips.
 pub struct Sounds {
     device: Option<sdl2::audio::AudioDevice<Mixer>>,
     voices: Arc<Mutex<Vec<Voice>>>,
+    clips: Option<Arc<[Vec<i16>; 5]>>,
 }
 
 impl Sounds {
@@ -142,11 +148,12 @@ impl Sounds {
         Self {
             device: None,
             voices: Arc::new(Mutex::new(Vec::new())),
+            clips: None,
         }
     }
 
     pub fn open(sdl: &sdl2::Sdl) -> Self {
-        let mut silent = Self::silent();
+        let mut sounds = Self::silent();
         let clips = match Cue::ALL
             .iter()
             .map(|cue| {
@@ -162,15 +169,30 @@ impl Sounds {
             Ok(clips) => clips,
             Err(error) => {
                 eprintln!("Luma sounds: {error}");
-                return silent;
+                return sounds;
             }
         };
-        let clips: Arc<[Vec<i16>; 5]> = Arc::new(clips.try_into().unwrap());
+        sounds.clips = Some(Arc::new(clips.try_into().unwrap()));
+        sounds.reconnect(sdl);
+        sounds
+    }
+
+    /// (Re)opens the current default output. Without decoded clips (silent player) it does
+    /// nothing; on failure the player stays silent until the next reconnect.
+    pub fn reconnect(&mut self, sdl: &sdl2::Sdl) {
+        let Some(clips) = self.clips.clone() else {
+            return;
+        };
+        // Close the old stream first: it may point at an output that no longer exists.
+        self.device = None;
+        if let Ok(mut voices) = self.voices.lock() {
+            voices.clear();
+        }
         let audio = match sdl.audio() {
             Ok(audio) => audio,
             Err(error) => {
                 eprintln!("Luma sounds: audio unavailable: {error}");
-                return silent;
+                return;
             }
         };
         let desired = sdl2::audio::AudioSpecDesired {
@@ -179,7 +201,7 @@ impl Sounds {
             // About 10 ms per buffer keeps clicks in step with focus movement.
             samples: Some(512),
         };
-        let voices = silent.voices.clone();
+        let voices = self.voices.clone();
         match audio.open_playback(None, &desired, |spec| Mixer {
             clips,
             voices,
@@ -187,16 +209,19 @@ impl Sounds {
         }) {
             Ok(device) => {
                 device.resume();
-                silent.device = Some(device);
+                self.device = Some(device);
             }
             Err(error) => eprintln!("Luma sounds: could not open output: {error}"),
         }
-        silent
     }
 
     pub fn play(&self, cue: Cue) {
-        if self.device.is_none() {
+        let Some(device) = &self.device else {
             return;
+        };
+        // A stream the system paused (e.g. while another app had the audio) is resumed.
+        if device.status() != sdl2::audio::AudioStatus::Playing {
+            device.resume();
         }
         if let Ok(mut voices) = self.voices.lock() {
             if voices.len() >= MAX_VOICES {
