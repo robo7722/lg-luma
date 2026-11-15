@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.6.1
+
+### Patch Changes
+
+- Play UI sounds at half their previous volume again, and tick when the Magic Remote pointer moves onto another item, like the arrow keys do.
+
 ## 3.6.0
 
 ### Minor Changes

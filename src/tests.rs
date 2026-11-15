@@ -3723,10 +3723,11 @@ fn remote_navigation_queues_focus_bump_select_and_back_clicks() {
     state.confirm();
     state.go_back();
     assert_eq!(state.cues, [Cue::Select, Cue::Back]);
-    // Pointer hover and plain state changes never click.
+    // Pointing at another control with the Magic Remote ticks too.
     state.cues.clear();
     state.pointer_focus(Target::Sidebar(1));
-    assert!(state.cues.is_empty());
+    assert_eq!(state.cues, [Cue::Focus]);
+    state.cues.clear();
     // The setting silences every cue and is saved.
     state.preferences.ui_sounds = false;
     state.navigate(Direction::Down, &controls(&state));
@@ -3751,6 +3752,36 @@ fn the_sounds_setting_toggles_in_general() {
     assert!(!state.preferences.ui_sounds);
     state.activate();
     assert!(state.preferences.ui_sounds);
+}
+
+#[test]
+fn magic_remote_pointing_ticks_and_clicking_selects() {
+    use crate::audio::Cue;
+    let mut state = ready();
+    let other = controls(&state)
+        .into_iter()
+        .map(|control| control.target)
+        .find(|target| *target != state.focus)
+        .unwrap();
+    // Pointing at another control ticks once; resting on it stays quiet.
+    state.pointer_focus(other.clone());
+    assert_eq!(state.cues, [Cue::Focus]);
+    state.pointer_focus(other);
+    assert_eq!(state.cues, [Cue::Focus]);
+    // A pointer click confirms like OK and plays the select sound.
+    state.cues.clear();
+    state.confirm();
+    assert_eq!(state.cues.first(), Some(&Cue::Select));
+    // With sounds off the pointer is silent.
+    state.cues.clear();
+    state.preferences.ui_sounds = false;
+    let next = controls(&state)
+        .into_iter()
+        .map(|control| control.target)
+        .find(|target| *target != state.focus)
+        .unwrap();
+    state.pointer_focus(next);
+    assert!(state.cues.is_empty());
 }
 
 #[test]
