@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.6.2
+
+### Patch Changes
+
+- UI sounds come back after leaving another app such as Zattoo, or after switching the TV's audio to a soundbar: Luma reopens the sound output when it returns to the foreground or the output changes.
+
 ## 3.6.1
 
 ### Patch Changes
