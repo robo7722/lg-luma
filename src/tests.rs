@@ -3767,3 +3767,36 @@ fn section_glides_get_a_faint_cue_unless_sounds_or_motion_are_off() {
     state.section_cue();
     assert!(state.cues.is_empty());
 }
+
+#[test]
+fn the_focus_ring_glides_between_cards_and_the_card_lifts_for_the_remote() {
+    use crate::state::{FOCUS_GLIDE, FOCUS_LIFT, Rect};
+    let mut state = ready();
+    let to = Rect::new(400., 820., 270., 154.4);
+    assert!(state.focus_glide(to).is_none());
+    assert_eq!(state.focus_lift(), 0.);
+    let now = std::time::Instant::now();
+    state.focus_from = Some((Rect::new(100., 820., 270., 154.4), now));
+    state.focus_lifted = Some(now);
+    // Just started: the ring is still near where it was and the card has not risen.
+    let ring = state.focus_glide(to).unwrap();
+    assert!(ring.x < 150.);
+    assert!(state.focus_lift() < 1.);
+    assert!(state.animating());
+    // Settled: the ring sits on the card and the card is fully raised.
+    let past = now - std::time::Duration::from_secs_f32(FOCUS_GLIDE * 2.);
+    state.focus_from = Some((Rect::new(100., 820., 270., 154.4), past));
+    state.focus_lifted = Some(past);
+    assert!(state.focus_glide(to).is_none());
+    assert!((state.focus_lift() - FOCUS_LIFT).abs() < 1e-3);
+    state.dirty = false;
+    state.tick();
+    assert!(state.focus_from.is_none());
+    assert!(state.dirty);
+    // Pointer use and reduced motion keep everything still.
+    state.pointer = true;
+    assert_eq!(state.focus_lift(), 0.);
+    state.pointer = false;
+    state.preferences.reduced_motion = true;
+    assert_eq!(state.focus_lift(), 0.);
+}

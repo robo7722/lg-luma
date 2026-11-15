@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.6.0
+
+### Minor Changes
+
+- Liquid focus: the focus ring glides between cards on a gentle spring and the remote-focused card lifts slightly, in the dock, the app drawer and the background gallery. Pointer use and Reduce motion keep cards still.
+
 ## 3.5.1
 
 ### Patch Changes

@@ -944,6 +944,7 @@ fn run() -> Result<(), String> {
     let mut back_button = BackButton::default();
     let mut last_minute = None;
     let mut shown_page = state.page;
+    let mut shown_focus = state.focus.clone();
     let mut shown_section = state.section;
     // Motion that started this frame restarts once the frame is on screen: the TV can take
     // longer than the whole animation to lay out a page it has not drawn before.
@@ -1770,6 +1771,30 @@ fn run() -> Result<(), String> {
         if state.panel_started != seen_panel {
             restart_motion |= state.panel_started.is_some();
             seen_panel = state.panel_started;
+        }
+        // Remote focus moving between cards: the ring glides from where it was drawn and the
+        // new card lifts. Pointer focus and scripted captures stay still.
+        if state.focus != shown_focus {
+            let from = scene
+                .controls
+                .iter()
+                .find(|control| control.target == shown_focus)
+                .map(|control| control.rect);
+            if options.script.is_empty()
+                && !state.pointer
+                && state::ring_target(&state.focus)
+                && state::ring_target(&shown_focus)
+                && let Some(from) = from
+            {
+                let lift = state.focus_lift();
+                let from = state::Rect::new(from.x, from.y - lift, from.w, from.h);
+                state.focus_from = Some((from, Instant::now()));
+            } else {
+                state.focus_from = None;
+            }
+            state.focus_lifted = (options.script.is_empty() && !state.pointer).then(Instant::now);
+            state.dirty = true;
+            shown_focus = state.focus.clone();
         }
         for cue in state.cues.drain(..) {
             sounds.play(cue);

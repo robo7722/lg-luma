@@ -363,6 +363,12 @@ and takeover boot staging uses a bundled fallback.
 
 ### Liquid Glass motion
 
+Remote focus moving between ring-style cards (dock, drawer, background gallery) glides the ring
+from the previous card's drawn rect over `FOCUS_GLIDE` (0.24 s) on `state::spring`, drawn above
+the page (`Scene::gliding_ring`) so neighbouring cards never cover it, and the focused app card
+rises `FOCUS_LIFT` (8 px). The event loop records the previous rect when focus changes; pointer
+focus, scripted captures and Reduce motion keep cards still, and hit targets never move.
+
 Page, section and subpage entrances use `Scene::cascade`: each draw starts up to 0.14 s / 0.1 s /
 0.08 s later the further down it sits, fades in with an ease-out and moves with `state::spring`, an
 ease-out-back curve that overshoots about 4 % and settles. Totals: page 0.56 s, section 0.42 s,

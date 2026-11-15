@@ -189,6 +189,9 @@ pub struct Scene {
     pub draw: Vec<Draw>,
     pub controls: Vec<Control>,
     pub modal: Option<Rect>,
+    /// A focus ring that is gliding between cards, drawn above the page so neighbours
+    /// never cover it.
+    gliding_ring: Option<(Rect, f32)>,
 }
 impl Scene {
     fn glass(&mut self, rect: Rect, radius: f32) {
@@ -199,6 +202,7 @@ impl Scene {
             draw: Vec::new(),
             controls: Vec::new(),
             modal: None,
+            gliding_ring: None,
         }
     }
     fn shape(&mut self, rect: Rect, radius: f32, fill: Color) {
@@ -748,6 +752,9 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
     );
     out.draw.push(Draw::EdgeFade(None));
     out.draw.push(Draw::Clip(None));
+    if let Some((ring, radius)) = out.gliding_ring.take() {
+        out.ring(ring, radius);
+    }
     header(&mut out, state, assets, now);
     if matches!(state.overlay, Some(Overlay::Inputs | Overlay::Settings)) {
         let start = out.draw.len();
@@ -1151,8 +1158,17 @@ fn tile(out: &mut Scene, state: &State, assets: &Assets, app: &App, rect: Rect, 
             c(0xededed, 1.),
         );
     }
+    // The remote-focused card rises a little on a spring; its hit target stays put.
+    let lift = if focused { state.focus_lift() } else { 0. };
+    if lift != 0. {
+        out.shift(start, 0., -lift);
+    }
     if focused {
-        out.ring(rect, 19.2);
+        let lifted = Rect::new(rect.x, rect.y - lift, rect.w, rect.h);
+        match state.focus_glide(lifted) {
+            Some(ring) => out.gliding_ring = Some((ring, 19.2)),
+            None => out.ring(lifted, 19.2),
+        }
     }
     if state.pressed.as_ref() == Some(&target) {
         out.fade(start, 1., 0.85);
@@ -2824,7 +2840,10 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                     out.icon(assets, "check", check.inset(3.6), c(0x333333, 1.));
                 }
                 if state.focus == Target::Background(index) {
-                    out.ring(rect, 16.);
+                    match state.focus_glide(rect) {
+                        Some(ring) => out.gliding_ring = Some((ring, 16.)),
+                        None => out.ring(rect, 16.),
+                    }
                 }
                 out.control(Target::Background(index), rect, true);
             }
