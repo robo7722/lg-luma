@@ -1351,6 +1351,8 @@ impl State {
         if self.focus == target {
             return;
         }
+        // Pointing at another control ticks like moving focus with the arrow keys.
+        self.cue(crate::audio::Cue::Focus);
         if let Target::Sidebar(section) = target {
             if self.subpage == Some(Subpage::WeatherLocation) {
                 self.weather.cancel_search();
@@ -2397,7 +2399,7 @@ impl State {
     }
 
     /// Remote arrow keys: `direction` plus a Focus click when anything moved, or a Bump when
-    /// the key reached an edge. Pointer hover never calls this.
+    /// the key reached an edge. Pointer hover ticks in `pointer_focus` instead.
     pub fn navigate(&mut self, direction: Direction, controls: &[Control]) -> Vec<Effect> {
         let before = (
             self.focus.clone(),
