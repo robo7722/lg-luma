@@ -3769,7 +3769,7 @@ fn section_glides_get_a_faint_cue_unless_sounds_or_motion_are_off() {
 }
 
 #[test]
-fn the_focus_ring_glides_between_cards_and_the_card_lifts_for_the_remote() {
+fn the_focus_ring_glides_between_cards_and_the_card_lifts() {
     use crate::state::{FOCUS_GLIDE, FOCUS_LIFT, Rect};
     let mut state = ready();
     let to = Rect::new(400., 820., 270., 154.4);
@@ -3793,10 +3793,9 @@ fn the_focus_ring_glides_between_cards_and_the_card_lifts_for_the_remote() {
     state.tick();
     assert!(state.focus_from.is_none());
     assert!(state.dirty);
-    // Pointer use and reduced motion keep everything still.
+    // The Magic Remote pointer lifts cards too; reduced motion keeps everything still.
     state.pointer = true;
-    assert_eq!(state.focus_lift(), 0.);
-    state.pointer = false;
+    assert!((state.focus_lift() - FOCUS_LIFT).abs() < 1e-3);
     state.preferences.reduced_motion = true;
     assert_eq!(state.focus_lift(), 0.);
 }

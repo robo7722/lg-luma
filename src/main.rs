@@ -1772,8 +1772,8 @@ fn run() -> Result<(), String> {
             restart_motion |= state.panel_started.is_some();
             seen_panel = state.panel_started;
         }
-        // Remote focus moving between cards: the ring glides from where it was drawn and the
-        // new card lifts. Pointer focus and scripted captures stay still.
+        // Focus moving between cards (remote or Magic Remote pointer): the ring glides from
+        // where it was drawn and the new card lifts. Scripted captures stay still.
         if state.focus != shown_focus {
             let from = scene
                 .controls
@@ -1781,7 +1781,6 @@ fn run() -> Result<(), String> {
                 .find(|control| control.target == shown_focus)
                 .map(|control| control.rect);
             if options.script.is_empty()
-                && !state.pointer
                 && state::ring_target(&state.focus)
                 && state::ring_target(&shown_focus)
                 && let Some(from) = from
@@ -1792,7 +1791,7 @@ fn run() -> Result<(), String> {
             } else {
                 state.focus_from = None;
             }
-            state.focus_lifted = (options.script.is_empty() && !state.pointer).then(Instant::now);
+            state.focus_lifted = options.script.is_empty().then(Instant::now);
             state.dirty = true;
             shown_focus = state.focus.clone();
         }

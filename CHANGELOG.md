@@ -4,7 +4,7 @@
 
 ### Minor Changes
 
-- Liquid focus: the focus ring glides between cards on a gentle spring and the remote-focused card lifts slightly, in the dock, the app drawer and the background gallery. Pointer use and Reduce motion keep cards still.
+- Liquid focus: the focus ring glides between cards on a gentle spring and the remote-focused card lifts slightly, in the dock, the app drawer and the background gallery, with the remote and the Magic Remote pointer. Reduce motion keeps cards still.
 
 ## 3.5.1
 

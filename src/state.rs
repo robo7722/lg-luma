@@ -297,7 +297,7 @@ pub struct State {
     pub page_started: Option<Instant>,
     /// Remote focus moving between cards: the ring's previous rect and when it left.
     pub focus_from: Option<(Rect, Instant)>,
-    /// When the focused card started lifting; None while the pointer is in use.
+    /// When the focused card started lifting.
     pub focus_lifted: Option<Instant>,
     /// UI click cues to play this frame, drained by the event loop.
     pub cues: Vec<crate::audio::Cue>,
@@ -594,7 +594,7 @@ impl State {
 
     /// The ring's rect while it glides from the previous card to `to`, springing into place.
     pub fn focus_glide(&self, to: Rect) -> Option<Rect> {
-        if self.preferences.reduced_motion || self.pointer {
+        if self.preferences.reduced_motion {
             return None;
         }
         let (from, started) = self.focus_from?;
@@ -612,9 +612,10 @@ impl State {
         ))
     }
 
-    /// How far the remote-focused card is raised; nothing for the pointer or reduced motion.
+    /// How far the focused card is raised (remote or Magic Remote pointer); nothing with
+    /// reduced motion. Only the drawing rises: the hit target stays where it was.
     pub fn focus_lift(&self) -> f32 {
-        if self.preferences.reduced_motion || self.pointer || self.moving.is_some() {
+        if self.preferences.reduced_motion || self.moving.is_some() {
             return 0.;
         }
         self.focus_lifted.map_or(0., |started| {
