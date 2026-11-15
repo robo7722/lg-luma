@@ -4,7 +4,8 @@
 
 ### Minor Changes
 
-- Liquid focus: the focus ring glides between cards on a gentle spring and the remote-focused card lifts slightly, in the dock, the app drawer and the background gallery, with the remote and the Magic Remote pointer. Reduce motion keeps cards still.
+- Liquid Glass focus: the focus flows between cards like a drop of liquid, stretching along its path and springing into place, in the dock, the app drawer and the background gallery, with the remote and the Magic Remote pointer.
+- The focused card rises and grows slightly on a glass lens with a soft shadow, catches a diagonal light sheen as focus lands, and the card focus left settles back down. Reduce motion keeps cards still.
 
 ## 3.5.1
 

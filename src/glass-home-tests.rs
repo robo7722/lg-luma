@@ -889,3 +889,52 @@ fn connecting_the_first_input_gives_an_empty_dropdown_a_valid_remote_target() {
     assert_eq!(state.focus, Target::InputsMenu);
     assert!(state.overlay.is_none());
 }
+
+#[test]
+fn the_focus_lens_lies_under_every_dock_card_and_the_sheen_stays_on_the_card() {
+    let mut state = ready();
+    let rendered = scene(&state);
+    let control = rendered
+        .controls
+        .iter()
+        .find(|control| matches!(control.target, Target::App(_)))
+        .unwrap();
+    let first = control.rect;
+    state.focus = control.target.clone();
+    // Halfway through the focus settling: raised, grown and catching the light.
+    let started = std::time::Instant::now()
+        - std::time::Duration::from_secs_f32(crate::state::FOCUS_SETTLE * 0.5);
+    state.focus_lifted = Some(started);
+    let rendered = scene(&state);
+    let shown = crate::state::raised(first, crate::state::FOCUS_LIFT);
+    let lens = rendered
+        .draw
+        .iter()
+        .position(|draw| {
+            matches!(draw, Draw::Glass(rect, ..)
+                if (rect.x - (shown.x - 14.)).abs() < 0.01 && (rect.w - (shown.w + 28.)).abs() < 0.01)
+        })
+        .expect("glass lens around the raised card");
+    // Every card's shadow (the first draw of each tile) comes after the lens.
+    let cards = rendered
+        .draw
+        .iter()
+        .enumerate()
+        .filter(
+            |(_, draw)| matches!(draw, Draw::Shadow(rect, ..) if rect.h > 150. && rect.w < 300.),
+        )
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    assert!(cards.len() > 2);
+    assert!(cards.iter().all(|index| *index > lens), "{lens} {cards:?}");
+    let sheen = rendered
+        .draw
+        .iter()
+        .find_map(|draw| match draw {
+            Draw::Sheen(rect, _, position, alpha) => Some((*rect, *position, *alpha)),
+            _ => None,
+        })
+        .expect("sheen on the focused card");
+    assert!((sheen.0.x - shown.x).abs() < 0.01 && (sheen.0.w - shown.w).abs() < 0.01);
+    assert!(sheen.1 > 0. && sheen.1 < 1. && sheen.2 > 0.);
+}

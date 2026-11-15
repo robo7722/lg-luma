@@ -45,6 +45,26 @@ void main() {
         gl_FragColor = color * vec4(1.0, 1.0, 1.0, edge_coverage());
         return;
     }
+    if (v_params.y < -2999.0) {
+        // Sheen: a slanted band of light crossing the rounded card, a broad soft glow with a
+        // thin bright streak just behind it, like light sliding over curved glass.
+        vec2 half_box = v_shape.zw;
+        float r = min(v_params.x, min(half_box.x, half_box.y));
+        vec2 k = abs(v_shape.xy) - half_box + vec2(r);
+        float edge = length(max(k, vec2(0.0))) + min(max(k.x, k.y), 0.0) - r;
+        float inside = clamp(0.5 - edge / u_aa, 0.0, 1.0);
+        float slant = 0.45;
+        float span = half_box.x + half_box.y * slant + 60.0;
+        float s = v_shape.x + v_shape.y * slant - mix(-span, span, v_color.r);
+        // Scaled before squaring so mediump stays in range.
+        float g = s / 42.0;
+        float t = (s + 34.0) / 7.75;
+        float glow = exp(-g * g);
+        float streak = exp(-t * t);
+        float light = 0.75 * glow + 0.6 * streak;
+        gl_FragColor = vec4(1.0, 1.0, 1.0, inside * light * v_color.a * edge_coverage());
+        return;
+    }
     bool glass = v_params.y < -999.0;
     float blur = glass ? 0.0 : max(-v_params.y, 0.0);
     vec2 half_size = v_shape.zw - vec2(blur);
