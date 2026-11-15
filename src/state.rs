@@ -42,11 +42,6 @@ pub const FOCUS_GLIDE: f32 = 0.3;
 pub const FOCUS_LIFT: f32 = 8.;
 /// How much a focused card grows once fully raised (5 %).
 pub const FOCUS_SCALE: f32 = 0.05;
-/// A soft highlight sweeps once across a card after focus lands on it.
-pub const FOCUS_SHEEN_DELAY: f32 = 0.12;
-pub const FOCUS_SHEEN: f32 = 0.62;
-/// Until then focus motion redraws every frame.
-pub const FOCUS_SETTLE: f32 = FOCUS_SHEEN_DELAY + FOCUS_SHEEN;
 
 /// Where a card is drawn when raised by `lift`: grown around its centre and moved up.
 pub fn raised(rect: Rect, lift: f32) -> Rect {
@@ -544,8 +539,7 @@ impl State {
             // One last frame draws the ring at rest on the new card.
             self.dirty = true;
         }
-        let settling = |started: Instant| started.elapsed().as_secs_f32() < FOCUS_SETTLE;
-        if gliding || self.focus_lifted.is_some_and(settling) {
+        if gliding || self.focus_lifted.is_some_and(focus_moving) {
             self.dirty = true;
         }
         // Page and section glides redraw every frame while they run, plus once at rest.
@@ -694,16 +688,6 @@ impl State {
         self.card_lift(&self.focus)
     }
 
-    /// Progress (0..1) of the highlight sweeping across the newly focused card.
-    pub fn focus_sheen(&self) -> Option<f32> {
-        if self.preferences.reduced_motion {
-            return None;
-        }
-        let elapsed = self.focus_lifted?.elapsed().as_secs_f32() - FOCUS_SHEEN_DELAY;
-        let t = elapsed / FOCUS_SHEEN;
-        (0. ..1.).contains(&t).then_some(t)
-    }
-
     /// Start of a running page glide, unless motion is reduced.
     pub fn page_glide(&self) -> Option<Instant> {
         self.page_started.filter(|started| {
@@ -722,7 +706,7 @@ impl State {
         self.focus_from.is_some()
             || self
                 .focus_lifted
-                .is_some_and(|started| started.elapsed().as_secs_f32() < FOCUS_SETTLE)
+                .is_some_and(|started| started.elapsed().as_secs_f32() < FOCUS_GLIDE)
             || self.page_transition().is_some()
             || self.section_glide().is_some()
             || (self.drawer_visibility != if self.page == Page::Apps { 1. } else { 0. })

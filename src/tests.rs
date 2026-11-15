@@ -3790,29 +3790,24 @@ fn the_focus_lens_flows_like_a_drop_and_lands_exactly() {
 }
 
 #[test]
-fn focused_cards_rise_grow_and_catch_a_sheen_and_the_old_card_settles() {
-    use crate::state::{FOCUS_LIFT, FOCUS_SCALE, FOCUS_SETTLE, Rect, raised};
+fn focused_cards_rise_and_grow_and_the_old_card_settles() {
+    use crate::state::{FOCUS_GLIDE, FOCUS_LIFT, FOCUS_SCALE, Rect, raised};
     let mut state = ready();
     let old = Target::App("old".into());
     state.focus = Target::App("new".into());
     // Scripted captures (no focus timing) stay flat but keep the focused shadow.
     assert_eq!(state.card_raise(&state.focus.clone()), 1.);
     assert_eq!(state.card_lift(&old), 0.);
-    assert!(state.focus_sheen().is_none());
     let now = std::time::Instant::now();
     state.focus_lifted = Some(now);
     state.focus_left = Some((old.clone(), now));
     assert!(state.card_lift(&old) > FOCUS_LIFT * 0.9);
     assert!(state.focus_lift() < 1.);
-    let past = now - std::time::Duration::from_secs_f32(FOCUS_SETTLE * 0.5);
-    state.focus_lifted = Some(past);
-    state.focus_left = Some((old.clone(), past));
-    assert!(state.focus_sheen().is_some());
-    assert!(state.card_lift(&old).abs() < 1e-3);
     assert!(state.animating());
-    let settled = now - std::time::Duration::from_secs_f32(FOCUS_SETTLE + 0.1);
+    let settled = now - std::time::Duration::from_secs_f32(FOCUS_GLIDE + 0.05);
     state.focus_lifted = Some(settled);
-    assert!(state.focus_sheen().is_none());
+    state.focus_left = Some((old.clone(), settled));
+    assert!(state.card_lift(&old).abs() < 1e-3);
     assert!((state.focus_lift() - FOCUS_LIFT).abs() < 1e-3);
     // A raised card grows around its centre and moves up by the lift.
     let card = Rect::new(100., 820., 270., 154.4);
@@ -3820,11 +3815,10 @@ fn focused_cards_rise_grow_and_catch_a_sheen_and_the_old_card_settles() {
     assert!((shown.w - card.w * (1. + FOCUS_SCALE)).abs() < 1e-3);
     assert!((shown.center().0 - card.center().0).abs() < 1e-3);
     assert!((shown.center().1 - (card.center().1 - FOCUS_LIFT)).abs() < 1e-3);
-    // Reduced motion: no rise, no sheen, and the old card is simply at rest.
+    // Reduced motion: no rise, and the old card is simply at rest.
     state.preferences.reduced_motion = true;
     state.focus_lifted = Some(now);
     assert_eq!(state.focus_lift(), 0.);
-    assert!(state.focus_sheen().is_none());
     assert_eq!(state.card_raise(&old), 0.);
 }
 

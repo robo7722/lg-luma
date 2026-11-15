@@ -251,9 +251,10 @@ impl Scene {
             scrollable,
         });
     }
+    /// The focus ring: a clear glass rim around the card, lit like a curved glass edge.
     fn ring(&mut self, rect: Rect, radius: f32) {
-        self.border(rect.inset(-6.9), radius + 6.9, 3.7, c(0xffffff, 0.10));
-        self.border(rect.inset(-3.2), radius + 3.2, 3.2, c(0xf0f0f0, 1.));
+        self.draw
+            .push(Draw::Rim(rect.inset(-8.), radius + 8., 7.5, 1.));
     }
     /// A glass lens around the focused card, inserted at `at` so it lies under every card
     /// of the row and glides beneath its neighbours.
@@ -272,15 +273,8 @@ impl Scene {
             ),
             Draw::Glass(outer, radius, c(0x787878, 0.94)),
             Draw::Shape(outer, radius, 0., c(0xffffff, 0.07)),
-            Draw::Shape(outer, radius, 1.4, c(0xffffff, 0.3)),
         ];
         self.draw.splice(at..at, lens);
-    }
-    /// Light sliding once across `card` (progress `t`), clipped to its rounded corners.
-    fn sheen(&mut self, card: Rect, radius: f32, t: f32) {
-        let eased = t * t * (3. - 2. * t);
-        let alpha = 0.28 * (std::f32::consts::PI * t).sin().sqrt();
-        self.draw.push(Draw::Sheen(card, radius, eased, alpha));
     }
     fn shadow(&mut self, rect: Rect, radius: f32, blur: f32, y: f32, alpha: f32) {
         self.draw.push(Draw::Shadow(
@@ -322,7 +316,7 @@ impl Scene {
                 | Draw::Image(_, rect, ..)
                 | Draw::TintedImage(_, rect, ..)
                 | Draw::AppImage(_, rect, ..)
-                | Draw::Sheen(rect, ..)
+                | Draw::Rim(rect, ..)
                 | Draw::Clip(Some(rect)) => shift(rect),
                 Draw::EdgeFade(Some(edges)) => edges.iter_mut().for_each(|y| *y += dy),
                 Draw::EdgeFadeX(Some(edges)) => edges.iter_mut().for_each(|x| *x += dx),
@@ -352,7 +346,7 @@ impl Scene {
                 | Draw::Image(_, rect, radius, ..)
                 | Draw::TintedImage(_, rect, radius, ..)
                 | Draw::AppImage(_, rect, radius, ..)
-                | Draw::Sheen(rect, radius, ..) => {
+                | Draw::Rim(rect, radius, ..) => {
                     scale(rect);
                     *radius *= k;
                 }
@@ -439,7 +433,7 @@ fn draw_rect(draw: &Draw) -> Option<Rect> {
         | Draw::Image(_, rect, ..)
         | Draw::TintedImage(_, rect, ..)
         | Draw::AppImage(_, rect, ..)
-        | Draw::Sheen(rect, ..)
+        | Draw::Rim(rect, ..)
         | Draw::Clip(Some(rect)) => Some(*rect),
         _ => None,
     }
@@ -457,7 +451,7 @@ fn animate_draw(draw: &mut Draw, alpha: f32, dx: f32, dy: f32) {
         | Draw::Image(_, rect, ..)
         | Draw::TintedImage(_, rect, ..)
         | Draw::AppImage(_, rect, ..)
-        | Draw::Sheen(rect, ..)
+        | Draw::Rim(rect, ..)
         | Draw::Clip(Some(rect)) => {
             rect.x += dx;
             rect.y += dy;
@@ -486,7 +480,7 @@ fn fade_draw(draw: &mut Draw, alpha: f32, brightness: f32) {
             apply(a);
             apply(b);
         }
-        Draw::Sheen(.., opacity) => *opacity *= alpha,
+        Draw::Rim(.., opacity) => *opacity *= alpha,
         Draw::Image(path, rect, radius, contain) => {
             *draw = Draw::TintedImage(
                 path.clone(),
@@ -1228,9 +1222,6 @@ fn tile(out: &mut Scene, state: &State, assets: &Assets, app: &App, rect: Rect, 
             Rect::new(indicator.x + 40., indicator.y + 4., 16., 16.),
             c(0xededed, 1.),
         );
-    }
-    if focused && let Some(t) = state.focus_sheen() {
-        out.sheen(rect, 19.2, t);
     }
     // The focused card rises and grows a little on a spring and the card focus left settles
     // back; only the drawing moves, its hit target stays put.

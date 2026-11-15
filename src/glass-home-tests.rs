@@ -891,7 +891,7 @@ fn connecting_the_first_input_gives_an_empty_dropdown_a_valid_remote_target() {
 }
 
 #[test]
-fn the_focus_lens_lies_under_every_dock_card_and_the_sheen_stays_on_the_card() {
+fn the_focus_lens_lies_under_every_dock_card_and_a_glass_rim_rings_the_raised_card() {
     let mut state = ready();
     let rendered = scene(&state);
     let control = rendered
@@ -901,9 +901,9 @@ fn the_focus_lens_lies_under_every_dock_card_and_the_sheen_stays_on_the_card() {
         .unwrap();
     let first = control.rect;
     state.focus = control.target.clone();
-    // Halfway through the focus settling: raised, grown and catching the light.
+    // Focus has settled: the card is raised and grown.
     let started = std::time::Instant::now()
-        - std::time::Duration::from_secs_f32(crate::state::FOCUS_SETTLE * 0.5);
+        - std::time::Duration::from_secs_f32(crate::state::FOCUS_GLIDE * 2.);
     state.focus_lifted = Some(started);
     let rendered = scene(&state);
     let shown = crate::state::raised(first, crate::state::FOCUS_LIFT);
@@ -927,14 +927,16 @@ fn the_focus_lens_lies_under_every_dock_card_and_the_sheen_stays_on_the_card() {
         .collect::<Vec<_>>();
     assert!(cards.len() > 2);
     assert!(cards.iter().all(|index| *index > lens), "{lens} {cards:?}");
-    let sheen = rendered
+    let rim = rendered
         .draw
         .iter()
         .find_map(|draw| match draw {
-            Draw::Sheen(rect, _, position, alpha) => Some((*rect, *position, *alpha)),
+            Draw::Rim(rect, _, width, alpha) => Some((*rect, *width, *alpha)),
             _ => None,
         })
-        .expect("sheen on the focused card");
-    assert!((sheen.0.x - shown.x).abs() < 0.01 && (sheen.0.w - shown.w).abs() < 0.01);
-    assert!(sheen.1 > 0. && sheen.1 < 1. && sheen.2 > 0.);
+        .expect("glass rim around the focused card");
+    assert!((rim.0.x - (shown.x - 8.)).abs() < 0.01 && (rim.0.w - (shown.w + 16.)).abs() < 0.01);
+    assert!(rim.1 > 0. && rim.2 == 1.);
+    // The rim and lens no longer carry a sweeping light band.
+    assert!(lens < rendered.draw.len());
 }

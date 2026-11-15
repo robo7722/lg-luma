@@ -71,9 +71,9 @@ pub enum Draw {
     TintedImage(String, Rect, f32, bool, Color),
     /// Installed icon and its backdrop, composited before opacity and edge fading.
     AppImage(Arc<crate::app_artwork::Artwork>, Rect, f32, Color),
-    /// A diagonal band of light at `position` (0 = left of the card, 1 = right of it) with
-    /// peak opacity `alpha`, kept inside the rounded card `rect` / `radius`.
-    Sheen(Rect, f32, f32, f32),
+    /// A clear glass rim `width` wide just inside the rounded box `rect` / `radius`, lit from
+    /// the upper left like a curved glass edge, at opacity `alpha`.
+    Rim(Rect, f32, f32, f32),
     Clip(Option<Rect>),
     EdgeFade(Option<[f32; 4]>),
     /// Horizontal counterpart: [left fade-in start, end, right fade-out start, end].
@@ -327,7 +327,7 @@ fn profile_skip(command: &Draw) -> bool {
         Draw::Glass(..) => "glass",
         Draw::RoundedGradient(..) => "gradient",
         Draw::Shadow(..) => "shadow",
-        Draw::Sheen(..) => "sheen",
+        Draw::Rim(..) => "rim",
         Draw::Text(..) => "text",
         Draw::Clip(_) | Draw::EdgeFade(_) | Draw::EdgeFadeX(_) => return false,
     };
@@ -1324,12 +1324,12 @@ impl Renderer {
                     *color,
                     self.white.id,
                 ),
-                Draw::Sheen(rect, radius, position, alpha) => self.quad(
+                Draw::Rim(rect, radius, width, alpha) => self.quad(
                     *rect,
                     [0., 0., 1., 1.],
                     *radius,
                     -3000.,
-                    [*position, 0., 0., *alpha],
+                    [*width, 0., 0., *alpha],
                     self.white.id,
                 ),
                 Draw::Text(text, rect, size, color, centered) => {
