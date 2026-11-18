@@ -54,6 +54,7 @@ Stay inside broadcast-safe values: no pure `#FFFFFF`, no pure `#0000FF`, red onl
   clamped 2–6 px, plus a drop shadow) under the coloured text.
 - **Everything else:** `shadowed()`, a single hard black shadow at +3,+3 px.
 - Sizes (logical px): title 64, preview channel 52, menu rows 38, ticker 36, clock 54, date 28.
+- The header keeps the clock panel: the user tried a title-only header and preferred the clock box.
 - Long text uses `assets.fit_line` / `fit_text`. Never wrap a row.
 - Non-Latin scripts keep the bundled Noto fonts. `to_uppercase()` is safe for scripts without case.
 
@@ -106,6 +107,9 @@ let Evening mode dim it later, and consider a ±2 px shift of the whole layout e
 (one full redraw). Never animate continuously for this.
 
 ## 8. Verify
+
+**User rule:** Always show the user a design image (desktop screenshot) of every visual change
+and wait for their OK **before committing or pushing**.
 
 1. `pnpm assets` (needs `woff2_decompress` and Python fontTools, or `nix develop`).
 2. Desktop capture, e.g. with `"design":"retro"` in a preferences file:

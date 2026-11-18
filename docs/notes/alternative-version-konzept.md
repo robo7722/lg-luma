@@ -197,3 +197,10 @@ und die Einstellung noch nicht sichtbar. Je nach Stilentscheidung wird `vhs_home
 - App-Übersicht, Einstellungen und „Zuletzt verwendet“ bleiben vorerst im Liquid-Glass-Look.
 - Skill umbenannt: `.agents/skills/retro-look/`.
 - Vorschau-Screenshots (Desktop, keine TV-Aussage): ![[retro-home.png]] ![[retro-allapps.png]]
+
+## Feedback 2: Kopfzeile nur „HAUPTMENÜ“ (2026-11-18)
+
+- Wetterkanal-/Infokanal-Look und Umbenennung „Retro TV“ sind vom Nutzer bestätigt.
+- Test: Oben nur „HAUPTMENÜ“ ohne Uhr-/Datums-Panel → vom Nutzer **verworfen** („davor war es besser“).
+  Es bleibt beim Titel-Panel „HAUPTMENÜ“ plus Uhr-Panel mit Datum rechts.
+- **Arbeitsregel:** Vor jedem Commit/Push zuerst ein Design-Bild zeigen und das OK abwarten.
