@@ -200,7 +200,6 @@ impl DateFormat {
         }
     }
 
-    #[cfg(test)]
     pub fn format(self, language: Language, now: time::OffsetDateTime) -> String {
         let (year, month, day) = (now.year(), now.month() as u8, now.day());
         match self {
@@ -259,27 +258,27 @@ impl WeatherStyle {
     }
 }
 
-/// The whole interface's look: Liquid Glass, or a 1990s VCR on-screen display.
+/// The whole interface's look: Liquid Glass, or a stylised 1990s cable-TV info channel.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Design {
     #[default]
     Glass,
-    Vhs,
+    Retro,
 }
 
 impl Design {
     pub fn label_key(self) -> &'static str {
         match self {
             Self::Glass => "designGlass",
-            Self::Vhs => "designVhs",
+            Self::Retro => "designRetro",
         }
     }
 
     pub fn toggled(self) -> Self {
         match self {
-            Self::Glass => Self::Vhs,
-            Self::Vhs => Self::Glass,
+            Self::Glass => Self::Retro,
+            Self::Retro => Self::Glass,
         }
     }
 }

@@ -399,6 +399,21 @@ a faint Glide (mixed at 30 %, skipped with Reduce motion). The event loop drains
 runs and a missing audio device stay silent. `ui_sounds` (default on) is in Settings → General.
 `tools/sound-design/` holds the raw takes and recipe and is not packaged.
 
+### Retro TV design
+
+`Preferences::design` (`glass` default, `retro`) is toggled by General row `Setting(13)`. With
+`retro`, `State::retro_home()` is true on Home and `view::scene` draws `src/retro-view.rs`
+instead of the page, header and glass. Rows come from `State::retro_rows()` (dock favorites,
+then `Nav(1)`, `InputsMenu`, `LumaSettings`, `TvSettings`) and reuse those targets' normal
+activation, hold menu and move mode; `State::direction` routes Up/Down through them, and in move
+mode maps Up/Down to the existing Left/Right reorder. `RETRO_ROWS` (9) rows form a page; digit
+keys call `State::retro_digit`. Focus jumps without glide or lift. The event loop's redraw slot
+becomes half a second on retro Home, so only the blinking cursor (and the ticker, which cuts to
+its next message every 8 s) changes while idle; damage tracking keeps those redraws partial. A
+0.24 s band of tracking noise plays while the Home page glide runs (none with Reduce motion).
+Scanlines are static 1.5 px fills every 4 logical px. Design rules and effect recipes for later
+pages live in the `retro-look` agent skill (`.agents/skills/retro-look/`).
+
 ### Bing image of the day
 
 The `luma-bing` worker, started with the wallpaper service and stopped when it is dropped, keeps a

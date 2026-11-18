@@ -22,13 +22,13 @@ datum: 2026-11-18
 Die alternative Version behält `com.ecklf.luma`. Der Fernseher sieht sie dann als ganz normales Update:
 Takeover, Autostart, Input-Hook-Befehl und Einstellungen funktionieren weiter, ohne dass etwas umgestellt werden muss.
 
-| Baustein | Umsetzung |
-| --- | --- |
-| Quellcode | Branch `alt` in diesem Repo (oder eigenes Repo `lg-luma-alt`), regelmäßig von `main` gemergt |
-| Releases | eigene Tags `alt-vX.Y.Z` und eigener Feed `repo-alt.json` (oder eigenes Repo) |
-| Kanalwahl | in Luma: **Einstellungen → System → Update-Kanal: Stabil / Alternativ** |
-| Wechsel | Kanal umschalten → Luma lädt die neueste IPK des anderen Kanals und installiert sie über das vorhandene `self-update.sh` |
-| Zurück | denselben Schalter zurückstellen. Notfalls die Stabil-IPK per SSH oder Dev Manager installieren |
+| Baustein  | Umsetzung                                                                                                                |
+| --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Quellcode | Branch `alt` in diesem Repo (oder eigenes Repo `lg-luma-alt`), regelmäßig von `main` gemergt                             |
+| Releases  | eigene Tags `alt-vX.Y.Z` und eigener Feed `repo-alt.json` (oder eigenes Repo)                                            |
+| Kanalwahl | in Luma: **Einstellungen → System → Update-Kanal: Stabil / Alternativ**                                                  |
+| Wechsel   | Kanal umschalten → Luma lädt die neueste IPK des anderen Kanals und installiert sie über das vorhandene `self-update.sh` |
+| Zurück    | denselben Schalter zurückstellen. Notfalls die Stabil-IPK per SSH oder Dev Manager installieren                          |
 
 ### Nötige Codeänderungen
 
@@ -63,6 +63,7 @@ Empfehlung: **umschaltbarer Modus in Luma** (Einstellungen → General → Desig
 keine separate App und kein zweiter Update-Kanal.
 
 Gründe:
+
 - Es ändert sich nur das Aussehen. App-Liste, Eingänge, Starten, Takeover und Einstellungen bleiben gleich.
   Eine zweite App würde all das duplizieren, und beide Versionen würden auseinanderlaufen.
 - Umschalten dauert eine Sekunde, ohne Installation und ohne Downgrade-Risiko.
@@ -72,6 +73,7 @@ Gründe:
   für Home/Drawer/Settings. Navigation und Zustand (`src/state.rs`) bleiben unverändert.
 
 Mögliche VHS-Elemente:
+
 - blauer Hintergrund, Blockschrift in Weiß/Gelb und ein OSD-Look wie „PLAY ▶“ oder „CH 03“
 - Menüpunkte als Liste mit blinkendem Cursor statt Glas-Karten
 - Scanlines, leichtes Farbflimmern und Tracking-Rauschen beim Seitenwechsel als Shader (`src/shaders/`)
@@ -105,6 +107,7 @@ Entwurf (Videorekorder-OSD, 1920×1080):
 ```
 
 Technik:
+
 - `view.rs`: `home()` verzweigt nach Design. Für VHS kommt `vhs_home()` dazu.
 - `state.rs`: Auf dem VHS-Home ist die Navigation **Hoch/Runter durch die Liste** statt Links/Rechts durch den Dock.
   Die vorhandenen `Target`s (Nav, InputsMenu, SettingsMenu …) werden wiederverwendet.
@@ -118,6 +121,7 @@ Technik:
 ## Skill-Recherche VHS/Retro-UI (2026-11-18)
 
 Gesucht wurde nach „vhs, retro ui, crt, scanlines, 90s, pixel font, glitch“ in den claude.ai-Skills und im Plugin-Verzeichnis.
+
 - **Es gibt keinen Skill und kein Plugin speziell für VHS- oder Retro-Look.**
 - Brauchbar ist **`webgl-shaders`** (bereits aktiv): GLSL-Post-Processing, Rauschen, Effekte.
   Er ist für WebGL im Browser geschrieben, aber das GLSL-Wissen passt auf Lumas OpenGL ES 2 (`src/shaders/*.frag`).
@@ -129,22 +133,26 @@ Gesucht wurde nach „vhs, retro ui, crt, scanlines, 90s, pixel font, glitch“ 
 ## Internet-Recherche VHS/Retro (2026-11-18)
 
 ### Skills
+
 Online gibt es **keinen Skill speziell für VHS-UI**. Gefunden wurden nur Verwandte, alle aus Drittanbieter-Verzeichnissen:
+
 - `bergside/awesome-design-skills` → **retro** (MIT): wenig Substanz. Generische Web-Palette (Blau/Lila), Schrift Macondo/JetBrains Mono, keine Effektregeln. Für uns kaum brauchbar.
 - **tui-designer** (ckorhonen): Terminal-/CRT-Look mit Scanlines, Glow und Wölbung, CSS-Ansatz, Bernstein-CRT-Palette. Die Effekt-Ideen sind gut, aber für Web/Terminal gedacht.
 - **windows-3-1-web-designer**, **vintage**, **vaporwave**, **retro-futurism**: falsche Epoche oder falscher Stil.
 - **visual-console-eras** (Blender): nennt VHS, ist aber Art Direction für 3D-Szenen und „Unverified“.
-→ Fazit: Ein eigener `vhs-look`-Skill im Repo ist sinnvoller als eine Installation von außen.
+  → Fazit: Ein eigener `vhs-look`-Skill im Repo ist sinnvoller als eine Installation von außen.
 
 ### Shader-Vorlagen (für `src/shaders/`, GLSL ES 1.0)
+
 - Godot Shaders „VHS and CRT monitor effect“, **CC0**: Scanlines, Grille, Verfärbung, Rauschen, Rolling Distortion.
 - Godot Shaders „Realistic CRT shader“, **CC0**: Scanlines (nach Timothy Lottes), Rauschen, horizontale Störungen, Chroma-Versatz.
   Läuft laut Nutzerbericht unter GLES2.
 - „VHS Scanline Glitch“, „Lofi Retro Camera Filter“: Lizenz bzw. GLES2 unklar, nur als Ideenquelle nutzen.
-Godot-Shader müssen auf reines GLSL portiert werden (`SCREEN_TEXTURE`/`TIME` → eigene Uniforms).
-Performance auf alten webOS-GPUs muss am TV geprüft werden.
+  Godot-Shader müssen auf reines GLSL portiert werden (`SCREEN_TEXTURE`/`TIME` → eigene Uniforms).
+  Performance auf alten webOS-GPUs muss am TV geprüft werden.
 
 ### Schrift
+
 - **VCR OSD Mono**: das Original, Lizenz aber **ungeklärt** („free“) → nicht ins Repo aufnehmen.
 - **Better VCR** (artdzyk 2023): **SIL OFL 1.1**, laut Anbieter 68 Sprachen inkl. Kyrillisch/Polnisch.
   Der beste Kandidat. Upstream-Quelle und genaue Glyphen-Abdeckung müssen vor der Aufnahme geprüft werden.
@@ -165,8 +173,9 @@ Performance auf alten webOS-GPUs muss am TV geprüft werden.
 
 Der Nutzer hat als Referenz einen Screenshot gezeigt („O'Brien's Weather Station“, YouTube-Stream).
 Das ist **nicht** das VCR-OSD-Menü, sondern der Look der **90er-Jahre-Kabel-TV-Infokanäle**:
+
 - bekannt als „Local on the 8s“ / WeatherStar-4000-Look (The Weather Channel, ca. 1990–1998)
-- Oberbegriffe: *Retro Broadcast Graphics*, *90s Cable TV Aesthetic*, *Weather Channel Aesthetic*
+- Oberbegriffe: _Retro Broadcast Graphics_, _90s Cable TV Aesthetic_, _Weather Channel Aesthetic_
 - Merkmale: blaue Verlaufs-Panels mit hellem Rahmen/Fase, Kopfzeile mit Titel-Box und Uhr-Box,
   fette abgerundete Grotesk in Gelb mit dickem schwarzem Rand/Schatten, weiße Labels links + gelbe Werte rechts,
   Pixel-Art-Icons, Laufschrift-Ticker unten, feine Scanlines.
@@ -176,3 +185,15 @@ Das ist **nicht** das VCR-OSD-Menü, sondern der Look der **90er-Jahre-Kabel-TV-
 Zwischenstand Code (WIP, Branch `ccr-39c15a48-9biymt`): `Design`-Präferenz (Glass/Vhs), Übersetzungen,
 vertikale Home-Navigation + Zifferntasten + Blink-Takt sind drin. Die VHS-Ansicht selbst ist noch nicht gebaut
 und die Einstellung noch nicht sichtbar. Je nach Stilentscheidung wird `vhs_home()` als OSD-Liste oder als Broadcast-Panel-Layout gezeichnet.
+
+## Entscheidung: „Retro TV“ statt VHS, Phase 1 umgesetzt (2026-11-18)
+
+- Der Nutzer will einen **stilisierten** Retro-Look mit der Stimmung der 90er-Kabel-TV-Infokanäle, keine Kopie.
+- Der Modus heißt jetzt **Retro TV** (`Preferences::design = "retro"`), umschaltbar unter Einstellungen → Allgemein → Design.
+- **Wetter nur unten im Ticker.** Die Box links zeigt das gewählte App-Icon als kleinen Röhrenmonitor („CH 01“).
+- Startseite: Titel-Panel „HAUPTMENÜ“, Uhr-Panel mit Datum, nummerierte Liste (Favoriten, Alle Apps, Eingänge,
+  Luma-Einstellungen, TV-Einstellungen), 9 Zeilen pro Seite, Zifferntasten 1–9, ▶-Cursor blinkt, Verschieben mit Hoch/Runter,
+  Ticker mit Hinweisen, Wetter und Datum (Wechsel alle 8 s), Scanlines, kurzes Bildrauschen beim Erscheinen.
+- App-Übersicht, Einstellungen und „Zuletzt verwendet“ bleiben vorerst im Liquid-Glass-Look.
+- Skill umbenannt: `.agents/skills/retro-look/`.
+- Vorschau-Screenshots (Desktop, keine TV-Aussage): ![[retro-home.png]] ![[retro-allapps.png]]

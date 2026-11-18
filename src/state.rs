@@ -112,8 +112,8 @@ pub fn spring(t: f32) -> f32 {
     1. + (overshoot + 1.) * u * u * u + overshoot * u * u
 }
 pub const CYCLE_FADE: f32 = 1.6;
-/// Rows per page of the VHS Home menu; number keys 1–9 address them.
-pub const VHS_ROWS: usize = 9;
+/// Rows per page of the Retro Home menu; number keys 1–9 address them.
+pub const RETRO_ROWS: usize = 9;
 
 pub fn unix_now() -> u64 {
     std::time::SystemTime::now()
@@ -777,13 +777,13 @@ impl State {
         pending
     }
 
-    /// Home drawn as the VHS on-screen menu (Recents still uses its own view).
-    pub fn vhs_home(&self) -> bool {
-        self.preferences.design == crate::model::Design::Vhs && self.page == Page::Home
+    /// Home drawn as the retro TV info-channel menu (Recents still uses its own view).
+    pub fn retro_home(&self) -> bool {
+        self.preferences.design == crate::model::Design::Retro && self.page == Page::Home
     }
 
-    /// The VHS Home menu, top to bottom: favorites, then all apps, inputs and both settings.
-    pub fn vhs_rows(&self) -> Vec<Target> {
+    /// The Retro Home menu, top to bottom: favorites, then all apps, inputs and both settings.
+    pub fn retro_rows(&self) -> Vec<Target> {
         let mut rows: Vec<_> = self
             .dock_apps()
             .iter()
@@ -798,8 +798,8 @@ impl State {
         rows
     }
 
-    fn vhs_direction(&mut self, direction: Direction, controls: &[Control]) {
-        let rows = self.vhs_rows();
+    fn retro_direction(&mut self, direction: Direction, controls: &[Control]) {
+        let rows = self.retro_rows();
         let index = rows.iter().position(|row| *row == self.focus);
         let next = match (direction, index) {
             (_, None) => 0,
@@ -810,18 +810,14 @@ impl State {
         self.focus(rows[next].clone(), controls);
     }
 
-    /// Number keys 1–9 pick the VHS menu row with that number on the current menu page.
-    pub fn vhs_digit(&mut self, digit: usize) -> Vec<Effect> {
-        if !self.vhs_home() || self.overlay.is_some() || self.moving.is_some() || digit == 0 {
+    /// Number keys 1–9 pick the retro menu row with that number on the current menu page.
+    pub fn retro_digit(&mut self, digit: usize) -> Vec<Effect> {
+        if !self.retro_home() || self.overlay.is_some() || self.moving.is_some() || digit == 0 {
             return vec![];
         }
-        let rows = self.vhs_rows();
-        let page = rows
-            .iter()
-            .position(|row| *row == self.focus)
-            .unwrap_or(0)
-            / VHS_ROWS;
-        let Some(row) = rows.get(page * VHS_ROWS + digit - 1).cloned() else {
+        let rows = self.retro_rows();
+        let page = rows.iter().position(|row| *row == self.focus).unwrap_or(0) / RETRO_ROWS;
+        let Some(row) = rows.get(page * RETRO_ROWS + digit - 1).cloned() else {
             return vec![];
         };
         self.focus = row;
@@ -1286,8 +1282,8 @@ impl State {
     }
 
     pub fn first_content(&self) -> Target {
-        if self.vhs_home() {
-            return self.vhs_rows().swap_remove(0);
+        if self.retro_home() {
+            return self.retro_rows().swap_remove(0);
         }
         match self.page {
             Page::Home => self
@@ -1681,10 +1677,10 @@ impl State {
         ) {
             return vec![];
         }
-        // VHS Home is one vertical list: Up/Down walk it, and in move mode they reorder.
-        let direction = if self.vhs_home() && self.overlay.is_none() {
+        // Retro Home is one vertical list: Up/Down walk it, and in move mode they reorder.
+        let direction = if self.retro_home() && self.overlay.is_none() {
             if self.moving.is_none() {
-                self.vhs_direction(direction, controls);
+                self.retro_direction(direction, controls);
                 return vec![];
             }
             match direction {

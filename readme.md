@@ -282,6 +282,17 @@ Choose the interface language in **Settings → General → Language**. Luma sup
 Czech, Dutch, English, French, German, Italian, Polish, Portuguese (Brazil), Russian,
 Simplified Chinese, Spanish, Swedish, Traditional Chinese and Vietnamese.
 
+### Retro TV design
+
+**Settings → General → Design** switches between **Liquid Glass** (default) and **Retro TV**, a
+stylised 1990s cable-TV info channel. Retro TV turns Home into a numbered menu on framed blue
+panels with bold outlined lettering: favorites first, then all apps, inputs, Luma settings and
+TV settings. A small "monitor" on the left shows the selected app's card and its channel number,
+and the ticker at the bottom carries the weather, the date and key hints. Up / Down move through
+the menu, the number keys 1–9 open the matching row on the current page, and hold **OK** →
+**Move** reorders favorites with Up / Down. The app drawer, Settings and Recent apps keep their
+Liquid Glass look for now.
+
 ### Sounds
 
 Remote navigation plays short clicks: focus moves, OK, Back, and a soft bump when a list ends.

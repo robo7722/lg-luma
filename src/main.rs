@@ -292,7 +292,7 @@ impl BackButton {
 }
 
 /// The number on a top-row or keypad digit key (only 1–9 reach here).
-fn vhs_digit(key: Keycode) -> usize {
+fn retro_digit(key: Keycode) -> usize {
     match key {
         Keycode::Num1 | Keycode::Kp1 => 1,
         Keycode::Num2 | Keycode::Kp2 => 2,
@@ -996,9 +996,9 @@ fn run() -> Result<(), String> {
             .time
             .unwrap_or_else(|| OffsetDateTime::now_utc().to_offset(local_offset));
         // Redraw once per minute, or once per second while seconds are shown.
-        // The VHS cursor blinks at 1 Hz: one half-second slot per phase.
-        let clock_slot = if state.vhs_home() {
-            (now.unix_timestamp_nanos() / view::VHS_BLINK_NANOS) as i64
+        // The retro cursor blinks at 1 Hz: one half-second slot per phase.
+        let clock_slot = if state.retro_home() {
+            (now.unix_timestamp_nanos() / view::RETRO_BLINK_NANOS) as i64
         } else if state.preferences.show_seconds {
             now.unix_timestamp()
         } else {
@@ -1530,7 +1530,7 @@ fn run() -> Result<(), String> {
                             if !repeat && !state.text_input_active() =>
                         {
                             press = None;
-                            pending = state.vhs_digit(vhs_digit(key));
+                            pending = state.retro_digit(retro_digit(key));
                         }
                         _ => {}
                     }
@@ -1838,7 +1838,7 @@ fn run() -> Result<(), String> {
                 .find(|control| control.target == shown_focus)
                 .map(|control| control.rect);
             if options.script.is_empty()
-                && !state.vhs_home()
+                && !state.retro_home()
                 && state::ring_target(&state.focus)
                 && state::ring_target(&shown_focus)
                 && let Some(from) = from
@@ -1850,8 +1850,8 @@ fn run() -> Result<(), String> {
             } else {
                 state.focus_from = None;
             }
-            // VHS focus jumps: no lens fade and no lift.
-            let now = (options.script.is_empty() && !state.vhs_home()).then(Instant::now);
+            // Retro focus jumps: no lens fade and no lift.
+            let now = (options.script.is_empty() && !state.retro_home()).then(Instant::now);
             state.focus_lifted = now;
             state.focus_left = now.map(|now| (shown_focus.clone(), now));
             state.dirty = true;

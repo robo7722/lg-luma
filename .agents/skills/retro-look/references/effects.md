@@ -1,4 +1,4 @@
-# VHS effects for Luma's GLES2 renderer
+# Retro TV effects for Luma's GLES2 renderer
 
 Luma renders the logical 1920×1080 scene as a list of draw commands with **partial redraw**
 (`src/damage.rs`). There is no full-screen framebuffer pass. Shaders are GLSL ES 1.0 with a
@@ -12,12 +12,12 @@ The recipes are written for this project. Godot Shaders' CC0 "VHS and CRT monito
 
 | Effect | When | Cost | How |
 | --- | --- | --- | --- |
-| Scanlines | always (VHS) | static, 1 quad | repeated 1×4 alpha texture or `paint.frag` branch, opacity 8–12 % |
+| Scanlines | always (Retro TV) | static, 1 quad | repeated 1×4 alpha texture or `paint.frag` branch, opacity 8–12 % |
 | Text drop shadow | always | 1 extra text draw | same text, black 60 %, +3,+3 px |
 | Chroma fringe on title | optional | 2 extra text draws | red copy −2 px x, cyan copy +2 px x, each 18 % alpha, under the main text |
 | Vignette | always | static, 1 quad | radial darkening ≤ 20 % at corners, drawn once |
 | Cursor blink | at rest | tiny damage rect | toggle visibility at 500 ms |
-| Tracking glitch | page change only, 180–240 ms | full redraw for ~12 frames | `paint.frag` branch with `u_vhs_time` |
+| Tracking glitch | page change only, 180–240 ms | full redraw for ~12 frames | `paint.frag` branch with `u_retro_time` |
 | Noise | only inside the glitch | in the glitch shader | 64×64 noise texture, scrolled |
 
 Nothing on the list runs continuously except the cursor.
@@ -43,7 +43,7 @@ At 4K drawables the logical grid still maps to 4 logical px, so line density sta
 ## Tracking glitch (page change only)
 
 New sentinel branch in `paint.frag` (follow the existing pattern: glass uses `v_params.y < -999.0`,
-the rim `< -2999.0`; pick e.g. `< -3999.0` for "VHS sample"). The quad samples the *previous or
+the rim `< -2999.0`; pick e.g. `< -3999.0` for "retro sample"). The quad samples the *previous or
 next page* texture, if one is available. Otherwise apply it as a darkening/brightening overlay band
 over the freshly drawn page. That is cheaper and needs no extra texture:
 
@@ -59,7 +59,7 @@ gl_FragColor = vec4(vec3(0.92), alpha);               // white-ish tracking band
 
 Horizontal jitter of the content (the classic "tear") can be faked without sampling: draw the new
 page's top-level commands with a per-row-band x offset of ±6–12 px for the first 80 ms only.
-For that, the view emits a `vhs_jitter` offset that `renderer.rs` applies to commands inside the band.
+For that, the view emits a `retro_jitter` offset that `renderer.rs` applies to commands inside the band.
 
 Rules:
 - Duration 180–240 ms, ease none, a single pass. Never loop.
@@ -93,5 +93,5 @@ black). Static. It may be combined into the scanline branch to save a draw.
 - [ ] Idle frames draw nothing new (diagnostics profile).
 - [ ] Text at 32 px is still crisp with the effect on (desktop screenshot, 100 % zoom).
 - [ ] Liquid Glass design shows zero difference (screenshot diff).
-- [ ] No new uniform is set while the VHS design is off.
+- [ ] No new uniform is set while the Retro TV design is off.
 - [ ] TV verification requested from the user (not claimed).
