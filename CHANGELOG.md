@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.8.1
+
+### Patch Changes
+
+- Retro TV: the hum bar and tracking glitches now move smoothly on the TV instead of only about once a second or while the Magic Remote pointer moves.
+
 ## 3.8.0
 
 ### Minor Changes

@@ -264,3 +264,10 @@ Offene Fragen an den Nutzer: welches Ton-Set, welche Musik? Soll die Musik nur a
      (9 s pro Durchlauf, sehr dezent) und etwa alle 12 s eine 0,3 s kurze Tracking-Störung mit Flackern.
      Retro-Seiten zeichnen dafür mit ~12 fps nur den betroffenen Streifen neu. Bei „Bewegungen reduzieren“ ist alles aus.
      Vorschau-Video: `scratchpad/retro-faults.mp4` (Desktop).
+
+## 3.8.0 Rückmeldung: Animation nur im Sekundentakt (2026-11-18)
+
+- Am TV bewegte sich der Brummbalken nur etwa einmal pro Sekunde oder wenn die Magic Remote bewegt wurde.
+- Ursache (vermutet): `SDL_WaitEventTimeout(100 ms)` schläft unter SDL-webOS deutlich länger.
+- Fix 3.8.1: Während der Bildfehler schläft die Hauptschleife selbst in ≤10-ms-Scheiben bis zum nächsten Schritt und pollt SDL nur noch.
+  Wegen der Regel für Event-Schleifen-Änderungen: erst Test-IPK am TV, dann veröffentlichen.

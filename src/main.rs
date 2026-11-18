@@ -2049,6 +2049,18 @@ fn run() -> Result<(), String> {
         } else {
             100
         };
+        // Retro TV picture faults step at about 12 fps without any input. SDL-webOS's timed wait
+        // can sleep about a second on TVs (the faults then only moved with the pointer), so
+        // sleep here in short slices until the next step instead, and only poll SDL.
+        let timeout = if timeout > 0 && visible && state.retro_faults() {
+            let period = view::RETRO_FAULT_NANOS;
+            let into = now.unix_timestamp_nanos().rem_euclid(period);
+            let until_next = ((period - into) / 1_000_000) as u64;
+            std::thread::sleep(Duration::from_millis(until_next.clamp(1, 10)));
+            0
+        } else {
+            timeout
+        };
         queued_event = sdl_events::wait(&mut events, timeout, webos);
     }
     if text_active {

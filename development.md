@@ -421,7 +421,9 @@ Scanlines are static 1.5 px fills every 4 logical px. `retro_view::tv_faults` ad
 (12 full-width strips, peak 4.5 % white, one roll per 9 s) and, once per 12 s window at a hashed
 moment, a 0.3 s tracking burst (2–5 % flicker plus a band of noisy streaks). Both follow the clock,
 so `--time` captures are reproducible. With `State::retro_faults()` (Retro, no Reduce motion, no
-Recents) the event loop's redraw slot is `RETRO_FAULT_NANOS` (~12 fps); damage tracking limits
+Recents) the event loop's redraw slot is `RETRO_FAULT_NANOS` (~12 fps). SDL-webOS's
+`SDL_WaitEventTimeout` can sleep about a second on TVs, so while faults run the loop sleeps itself
+in slices of at most 10 ms until the next step and only polls SDL (timeout 0); damage tracking limits
 each frame to the bar's strip and the cursor, except during a burst. On the Settings page `view::scene` ends
 with `retro_view::restyle`, which rewrites the finished Glass scene instead of a second layout:
 wallpaper → navy, light (focused) glass → yellow, other glass → gradient panel with frame,
