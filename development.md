@@ -397,6 +397,10 @@ lock. `State::navigate`, `confirm` and `go_back` queue cues for remote keys and 
 Focus when an arrow changed anything, Bump when it did not; a Settings section change also queues
 a faint Glide (mixed at 30 %, skipped with Reduce motion). The event loop drains them. Scripted
 runs and a missing audio device stay silent. `ui_sounds` (default on) is in Settings → General.
+The output is opened once at startup and never reopened or resumed from the event loop: 3.6.2
+(and 3.7.0, which still contained it) reopened it on foreground and SDL audio-device events, and
+that froze the launcher on TVs with no remote input until a downgrade. Verify any change to this on
+a TV with a PR test IPK before releasing it.
 `tools/sound-design/` holds the raw takes and recipe and is not packaged.
 
 ### Retro TV design

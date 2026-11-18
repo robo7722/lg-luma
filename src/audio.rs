@@ -230,10 +230,10 @@ impl sdl2::audio::AudioCallback for Mixer {
 
 /// Plays cues on the default output; inert when audio is unavailable.
 ///
-/// The output can disappear under the launcher: another app (e.g. a streaming app) takes
-/// the TV's audio while Luma is in the background, or the user switches to a soundbar. The
-/// event loop therefore calls `reconnect` when Luma returns to the foreground or SDL reports
-/// an audio device change, which reopens the default output with the already decoded clips.
+/// The output is opened once at startup and never reopened or resumed from the event loop:
+/// 3.6.2 reopened it on foreground and audio-device events, and on TVs that froze the whole
+/// launcher (no remote input) until it was downgraded. Keep it that way unless a change has
+/// been verified on a TV first.
 pub struct Sounds {
     device: Option<sdl2::audio::AudioDevice<Mixer>>,
     voices: Arc<Mutex<Vec<Voice>>>,
@@ -279,21 +279,15 @@ impl Sounds {
             Ok(_) => {}
             Err(error) => eprintln!("Luma music: {error}"),
         }
-        sounds.reconnect(sdl);
+        sounds.connect(sdl);
         sounds
     }
 
-    /// (Re)opens the current default output. Without decoded clips (silent player) it does
-    /// nothing; on failure the player stays silent until the next reconnect.
-    pub fn reconnect(&mut self, sdl: &sdl2::Sdl) {
+    /// Opens the default output once, at startup. On failure the player stays silent.
+    fn connect(&mut self, sdl: &sdl2::Sdl) {
         let Some(clips) = self.clips.clone() else {
             return;
         };
-        // Close the old stream first: it may point at an output that no longer exists.
-        self.device = None;
-        if let Ok(mut voices) = self.voices.lock() {
-            voices.clear();
-        }
         let audio = match sdl.audio() {
             Ok(audio) => audio,
             Err(error) => {
@@ -335,27 +329,15 @@ impl Sounds {
         if self.music.is_none() {
             return;
         }
+        // Only a flag for the audio thread: never touch the device from the event loop.
         if let Ok(mut state) = self.music_state.lock() {
-            if state.on == on {
-                return;
-            }
             state.on = on;
-        }
-        if on
-            && let Some(device) = &self.device
-            && device.status() != sdl2::audio::AudioStatus::Playing
-        {
-            device.resume();
         }
     }
 
     pub fn play(&self, cue: Cue) {
-        let Some(device) = &self.device else {
+        if self.device.is_none() {
             return;
-        };
-        // A stream the system paused (e.g. while another app had the audio) is resumed.
-        if device.status() != sdl2::audio::AudioStatus::Playing {
-            device.resume();
         }
         if let Ok(mut voices) = self.voices.lock() {
             if voices.len() >= MAX_VOICES {

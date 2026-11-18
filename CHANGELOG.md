@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.7.1
+
+### Patch Changes
+
+- Fix Luma freezing (no remote input) after updating: the sound output is opened once again, as in 3.6.1, instead of being reopened when Luma returns to the foreground or the audio device changes. That 3.6.2 change caused the freeze and had come back with 3.7.0.
+
 ## 3.7.0
 
 ### Minor Changes
