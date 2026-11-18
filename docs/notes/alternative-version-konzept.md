@@ -125,3 +125,28 @@ Gesucht wurde nach „vhs, retro ui, crt, scanlines, 90s, pixel font, glitch“ 
 - Allgemeine Design-Plugins (Anthropic „Design“, Superdesign, Refero) haben keinen Retro-Bezug und bringen für ein natives TV-UI wenig.
 - Falls gewünscht, schreiben wir einen eigenen Projekt-Skill `vhs-look`
   (Farbpalette, OSD-Typografie, Shader-Rezepte, Do/Don't), damit spätere Sitzungen den Stil konsistent halten.
+
+## Internet-Recherche VHS/Retro (2026-11-18)
+
+### Skills
+Online gibt es **keinen Skill speziell für VHS-UI**. Gefunden wurden nur Verwandte, alle aus Drittanbieter-Verzeichnissen:
+- `bergside/awesome-design-skills` → **retro** (MIT): wenig Substanz. Generische Web-Palette (Blau/Lila), Schrift Macondo/JetBrains Mono, keine Effektregeln. Für uns kaum brauchbar.
+- **tui-designer** (ckorhonen): Terminal-/CRT-Look mit Scanlines, Glow und Wölbung, CSS-Ansatz, Bernstein-CRT-Palette. Die Effekt-Ideen sind gut, aber für Web/Terminal gedacht.
+- **windows-3-1-web-designer**, **vintage**, **vaporwave**, **retro-futurism**: falsche Epoche oder falscher Stil.
+- **visual-console-eras** (Blender): nennt VHS, ist aber Art Direction für 3D-Szenen und „Unverified“.
+→ Fazit: Ein eigener `vhs-look`-Skill im Repo ist sinnvoller als eine Installation von außen.
+
+### Shader-Vorlagen (für `src/shaders/`, GLSL ES 1.0)
+- Godot Shaders „VHS and CRT monitor effect“, **CC0**: Scanlines, Grille, Verfärbung, Rauschen, Rolling Distortion.
+- Godot Shaders „Realistic CRT shader“, **CC0**: Scanlines (nach Timothy Lottes), Rauschen, horizontale Störungen, Chroma-Versatz.
+  Läuft laut Nutzerbericht unter GLES2.
+- „VHS Scanline Glitch“, „Lofi Retro Camera Filter“: Lizenz bzw. GLES2 unklar, nur als Ideenquelle nutzen.
+Godot-Shader müssen auf reines GLSL portiert werden (`SCREEN_TEXTURE`/`TIME` → eigene Uniforms).
+Performance auf alten webOS-GPUs muss am TV geprüft werden.
+
+### Schrift
+- **VCR OSD Mono**: das Original, Lizenz aber **ungeklärt** („free“) → nicht ins Repo aufnehmen.
+- **Better VCR** (artdzyk 2023): **SIL OFL 1.1**, laut Anbieter 68 Sprachen inkl. Kyrillisch/Polnisch.
+  Der beste Kandidat. Upstream-Quelle und genaue Glyphen-Abdeckung müssen vor der Aufnahme geprüft werden.
+  Für CJK/Vietnamesisch auf die bisherige Schrift zurückfallen.
+- VCR OSD Neue: nur „bitte nennen“, keine klare Lizenz → nicht verwenden.
