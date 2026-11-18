@@ -32,6 +32,8 @@ fn input_icon_width(name: &str, size: f32) -> f32 {
 
 #[path = "recents-view.rs"]
 mod recents_view;
+#[path = "retro-view.rs"]
+mod retro_view;
 
 pub struct Assets {
     pub root: PathBuf,
@@ -684,6 +686,9 @@ fn companion(
     out.control(Target::CloseDialog, close, false);
 }
 
+/// Half a period of the retro cursor blink (1 Hz), in nanoseconds.
+pub const RETRO_BLINK_NANOS: i128 = 500_000_000;
+
 fn c(rgb: u32, alpha: f32) -> Color {
     [
         ((rgb >> 16) & 255) as f32 / 255.,
@@ -760,75 +765,80 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
         }
         return out;
     }
-    let viewport = state.content_viewport();
-    let main_bottom = viewport.y + viewport.h;
-    if state.page == Page::Home {
-        out.draw.push(Draw::Clip(Some(viewport)));
-    }
-    match state.page {
-        Page::Home => home(&mut out, state, assets, now),
-        Page::Apps => library(&mut out, state, assets),
-        Page::Settings => settings(&mut out, state, assets),
-    }
-    if let Some(error) = &state.error
-        && !state.inventory.apps.is_empty()
-        && !out
-            .controls
-            .iter()
-            .any(|control| control.target == Target::Retry)
-    {
-        let rect = Rect::new(84., main_bottom - 66., 1752., 54.);
-        out.shape(rect, 11.2, c(0xad7c3e, 0.07));
-        out.border(rect, 11.2, 1., c(0xedc596, 0.19));
-        out.icon(
-            assets,
-            "alert",
-            Rect::new(104., rect.y + 18., 18., 18.),
-            c(0xf3ddbd, 1.),
-        );
-        out.text(
-            error,
-            Rect::new(138., rect.y + 16., 1500., 35.),
-            text(14.4, 400, 0.),
-            c(0xf3ddbd, 1.),
-            false,
-        );
-        let retry = Rect::new(1720., rect.y + 8., 96., 38.);
-        out.text(
-            state.preferences.language.t("retry"),
-            Rect::new(retry.x, retry.y + 10., retry.w, 20.),
-            text(14.4, 500, 0.),
-            c(0xf3ddbd, 1.),
-            true,
-        );
-        if state.focus == Target::Retry {
-            out.border(retry, 6.4, 2., WHITE);
+    if state.retro_home() {
+        // The retro Home draws its own full-screen layout, header and ticker included.
+        retro_view::home(&mut out, state, assets, now);
+    } else {
+        let viewport = state.content_viewport();
+        let main_bottom = viewport.y + viewport.h;
+        if state.page == Page::Home {
+            out.draw.push(Draw::Clip(Some(viewport)));
         }
-        out.control(Target::Retry, retry, false);
-    }
-    // The page flows in row by row, springing gently into place.
-    out.cascade(
-        content_start,
-        state.page_glide(),
-        crate::state::PAGE_TRANSITION,
-        0.,
-        80.,
-        0.14,
-    );
-    out.draw.push(Draw::EdgeFade(None));
-    out.draw.push(Draw::Clip(None));
-    if let Some((ring, radius)) = out.gliding_ring.take() {
-        // A faint clear drop: cards it passes over brighten slightly as if seen through glass,
-        // swelling in and out with the glide.
-        let t = state.focus_glide_progress().unwrap_or(1.);
-        out.shape(
-            ring,
-            radius,
-            c(0xffffff, 0.05 * (std::f32::consts::PI * t).sin()),
+        match state.page {
+            Page::Home => home(&mut out, state, assets, now),
+            Page::Apps => library(&mut out, state, assets),
+            Page::Settings => settings(&mut out, state, assets),
+        }
+        if let Some(error) = &state.error
+            && !state.inventory.apps.is_empty()
+            && !out
+                .controls
+                .iter()
+                .any(|control| control.target == Target::Retry)
+        {
+            let rect = Rect::new(84., main_bottom - 66., 1752., 54.);
+            out.shape(rect, 11.2, c(0xad7c3e, 0.07));
+            out.border(rect, 11.2, 1., c(0xedc596, 0.19));
+            out.icon(
+                assets,
+                "alert",
+                Rect::new(104., rect.y + 18., 18., 18.),
+                c(0xf3ddbd, 1.),
+            );
+            out.text(
+                error,
+                Rect::new(138., rect.y + 16., 1500., 35.),
+                text(14.4, 400, 0.),
+                c(0xf3ddbd, 1.),
+                false,
+            );
+            let retry = Rect::new(1720., rect.y + 8., 96., 38.);
+            out.text(
+                state.preferences.language.t("retry"),
+                Rect::new(retry.x, retry.y + 10., retry.w, 20.),
+                text(14.4, 500, 0.),
+                c(0xf3ddbd, 1.),
+                true,
+            );
+            if state.focus == Target::Retry {
+                out.border(retry, 6.4, 2., WHITE);
+            }
+            out.control(Target::Retry, retry, false);
+        }
+        // The page flows in row by row, springing gently into place.
+        out.cascade(
+            content_start,
+            state.page_glide(),
+            crate::state::PAGE_TRANSITION,
+            0.,
+            80.,
+            0.14,
         );
-        out.ring(ring, radius);
+        out.draw.push(Draw::EdgeFade(None));
+        out.draw.push(Draw::Clip(None));
+        if let Some((ring, radius)) = out.gliding_ring.take() {
+            // A faint clear drop: cards it passes over brighten slightly as if seen through glass,
+            // swelling in and out with the glide.
+            let t = state.focus_glide_progress().unwrap_or(1.);
+            out.shape(
+                ring,
+                radius,
+                c(0xffffff, 0.05 * (std::f32::consts::PI * t).sin()),
+            );
+            out.ring(ring, radius);
+        }
+        header(&mut out, state, assets, now);
     }
-    header(&mut out, state, assets, now);
     if matches!(state.overlay, Some(Overlay::Inputs | Overlay::Settings)) {
         let start = out.draw.len();
         corner_menu(&mut out, state, assets);
@@ -931,6 +941,12 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
             out.controls = parent_controls;
             out.modal = parent_modal;
         }
+    }
+    if state.preferences.design == crate::model::Design::Retro
+        && state.page == Page::Settings
+        && !recents_replaces_page(state)
+    {
+        retro_view::restyle(&mut out, assets, 0);
     }
     if let Some((notice, _)) = &state.notice {
         toast(&mut out, state, assets, notice);
@@ -2777,6 +2793,24 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                     false,
                 ),
                 (
+                    13,
+                    "design",
+                    "sparkles",
+                    Some(language.t(state.preferences.design.label_key())),
+                    false,
+                ),
+                (
+                    14,
+                    "retroMusic",
+                    "volume",
+                    Some(if state.preferences.retro_music {
+                        language.t("stateOn")
+                    } else {
+                        language.t("stateOff")
+                    }),
+                    false,
+                ),
+                (
                     2,
                     "reducedMotion",
                     "motion",
@@ -2789,6 +2823,10 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 ),
             ]
             .into_iter()
+            // Background music belongs to the Retro TV design only.
+            .filter(|(index, ..)| {
+                *index != 14 || state.preferences.design == crate::model::Design::Retro
+            })
             .enumerate()
             {
                 row(

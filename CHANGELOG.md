@@ -1,5 +1,12 @@
 # lg-luma
 
+## 3.7.0
+
+### Minor Changes
+
+- 70bbd54: Add a Retro TV design (Settings → General → Design): Home becomes a stylised 1990s cable-TV info channel menu with numbered rows, a monitor preview of the selected app, a weather and hint ticker, and number-key shortcuts. Luma Settings switch to the same look.
+- d90e244: Retro TV now has its own synth navigation sounds, a tape-noise cut when Home appears, and optional background music (Settings → General → Background music, off by default) that stops when an app opens.
+
 ## 3.6.2
 
 ### Patch Changes

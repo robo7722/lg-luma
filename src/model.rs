@@ -200,7 +200,6 @@ impl DateFormat {
         }
     }
 
-    #[cfg(test)]
     pub fn format(self, language: Language, now: time::OffsetDateTime) -> String {
         let (year, month, day) = (now.year(), now.month() as u8, now.day());
         match self {
@@ -259,9 +258,35 @@ impl WeatherStyle {
     }
 }
 
+/// The whole interface's look: Liquid Glass, or a stylised 1990s cable-TV info channel.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Design {
+    #[default]
+    Glass,
+    Retro,
+}
+
+impl Design {
+    pub fn label_key(self) -> &'static str {
+        match self {
+            Self::Glass => "designGlass",
+            Self::Retro => "designRetro",
+        }
+    }
+
+    pub fn toggled(self) -> Self {
+        match self {
+            Self::Glass => Self::Retro,
+            Self::Retro => Self::Glass,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Preferences {
+    pub design: Design,
     pub weather_style: WeatherStyle,
     pub app_sorting: AppSorting,
     pub app_launch_counts: BTreeMap<String, u64>,
@@ -307,6 +332,8 @@ pub struct Preferences {
     pub evening_dim: Option<u8>,
     /// Short clicks for remote navigation, OK and Back.
     pub ui_sounds: bool,
+    /// Retro TV design: quiet background music while Home is shown. Off by default.
+    pub retro_music: bool,
 }
 
 /// Start hours offered for evening mode.
@@ -336,6 +363,7 @@ pub fn evening_dim(start: Option<u8>, hour: u8, minute: u8) -> f32 {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
+            design: Design::default(),
             weather_style: WeatherStyle::default(),
             app_sorting: AppSorting::default(),
             app_launch_counts: BTreeMap::new(),
@@ -366,6 +394,7 @@ impl Default for Preferences {
             wallpaper_changed: 0,
             evening_dim: None,
             ui_sounds: true,
+            retro_music: false,
         }
     }
 }

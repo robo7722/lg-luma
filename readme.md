@@ -162,7 +162,7 @@ to help make Luma available by default.
 On your computer, replace `TV_IP`:
 
 ```sh
-scp -O dist/com.ecklf.luma_3.6.2_arm.ipk root@TV_IP:/tmp/luma.ipk
+scp -O dist/com.ecklf.luma_3.7.0_arm.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -282,6 +282,23 @@ Choose the interface language in **Settings → General → Language**. Luma sup
 Czech, Dutch, English, French, German, Italian, Polish, Portuguese (Brazil), Russian,
 Simplified Chinese, Spanish, Swedish, Traditional Chinese and Vietnamese.
 
+### Retro TV design
+
+**Settings → General → Design** switches between **Liquid Glass** (default) and **Retro TV**, a
+stylised 1990s cable-TV info channel. Retro TV turns Home into a numbered menu on framed blue
+panels with bold outlined lettering: favorites first, then all apps, inputs, Luma settings and
+TV settings. A small "monitor" on the left shows the selected app's card and its channel number,
+and the ticker at the bottom carries the weather, the date and key hints. Up / Down move through
+the menu, the number keys 1–9 open the matching row on the current page, and hold **OK** →
+**Move** reorders favorites with Up / Down. Luma's Settings keep their layout but switch
+to the same look (blue framed panels, yellow selection, bold lettering, scanlines). The app drawer
+and Recent apps keep their Liquid Glass look for now.
+
+Retro TV has its own synth blips for navigation and a short burst of tape noise when Home
+appears (both follow **Settings → General → Sounds**). **Settings → General → Background music**
+(shown with Retro TV, off by default) plays a quiet smooth-jazz loop while Home is shown; it fades
+out as soon as you open an app or leave Home and resumes where it stopped.
+
 ### Sounds
 
 Remote navigation plays short clicks: focus moves, OK, Back, and a soft bump when a list ends.
@@ -363,7 +380,7 @@ checksum-pinned SDL-webOS library; both downloads are cached under `.build/`.
 Output:
 
 ```text
-dist/com.ecklf.luma_3.6.2_arm.ipk
+dist/com.ecklf.luma_3.7.0_arm.ipk
 dist/sha256sums
 dist/repo.json
 dist/app-icon-large.png

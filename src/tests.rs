@@ -28,6 +28,9 @@ mod app_sorting_tests;
 #[path = "weather-style-tests.rs"]
 mod weather_style_tests;
 
+#[path = "retro-tests.rs"]
+mod retro_tests;
+
 fn ready() -> State {
     let mut state = State::new(Preferences::default());
     state.set_inventory(demo_inventory(), None);

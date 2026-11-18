@@ -399,6 +399,35 @@ a faint Glide (mixed at 30 %, skipped with Reduce motion). The event loop drains
 runs and a missing audio device stay silent. `ui_sounds` (default on) is in Settings → General.
 `tools/sound-design/` holds the raw takes and recipe and is not packaged.
 
+### Retro TV design
+
+`Preferences::design` (`glass` default, `retro`) is toggled by General row `Setting(13)`. With
+`retro`, `State::retro_home()` is true on Home and `view::scene` draws `src/retro-view.rs`
+instead of the page, header and glass. Rows come from `State::retro_rows()` (dock favorites,
+then `Nav(1)`, `InputsMenu`, `LumaSettings`, `TvSettings`) and reuse those targets' normal
+activation, hold menu and move mode; `State::direction` routes Up/Down through them, and in move
+mode maps Up/Down to the existing Left/Right reorder. `RETRO_ROWS` (9) rows form a page; digit
+keys call `State::retro_digit`. Focus jumps without glide or lift. The event loop's redraw slot
+becomes half a second on retro Home, so only the blinking cursor (and the ticker, which cuts to
+its next message every 8 s) changes while idle; damage tracking keeps those redraws partial. A
+0.24 s band of tracking noise plays while the Home page glide runs (none with Reduce motion).
+Scanlines are static 1.5 px fills every 4 logical px. On the Settings page `view::scene` ends
+with `retro_view::restyle`, which rewrites the finished Glass scene instead of a second layout:
+wallpaper → navy, light (focused) glass → yellow, other glass → gradient panel with frame,
+rims and soft shadows dropped, corners ≤ 6 px, text weight 800 with a hard shadow (single-line
+labels shrink to their original box), then scanlines. Controls and navigation are untouched. Design rules and effect recipes for later
+pages live in the `retro-look` agent skill (`.agents/skills/retro-look/`).
+
+Retro sounds: `State::cue` maps Focus/Select/Back/Bump to `Cue::Retro*` while the design is
+`retro`; entering retro Home queues `Cue::Tracking` (not with Reduce motion). `assets/sounds/retro-*.wav`
+follow the click format (48 kHz mono 16-bit, ≤ 250 ms; tracking ≤ 500 ms). The background loop
+`retro-music.wav` is 24 kHz mono (~57 s, ~2.7 MB, end crossfaded into the start) and is mixed in
+the same SDL callback with linear upsampling at `MUSIC_GAIN` 0.14, fading in over 0.8 s and out
+over 0.25 s. The event loop calls `Sounds::set_music(visible && focused &&
+State::retro_music_playing())`, i.e. `Preferences::retro_music` (General row `Setting(14)`, only
+listed with Retro TV, default off), retro Home, and no launch in progress. Its position is kept, so
+it resumes where it stopped. Sources and recipe: `tools/sound-design/retro/`.
+
 ### Bing image of the day
 
 The `luma-bing` worker, started with the wallpaper service and stopped when it is dropped, keeps a

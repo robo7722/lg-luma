@@ -112,6 +112,8 @@ pub fn spring(t: f32) -> f32 {
     1. + (overshoot + 1.) * u * u * u + overshoot * u * u
 }
 pub const CYCLE_FADE: f32 = 1.6;
+/// Rows per page of the Retro Home menu; number keys 1–9 address them.
+pub const RETRO_ROWS: usize = 9;
 
 pub fn unix_now() -> u64 {
     std::time::SystemTime::now()
@@ -775,6 +777,55 @@ impl State {
         pending
     }
 
+    /// Home drawn as the retro TV info-channel menu (Recents still uses its own view).
+    pub fn retro_home(&self) -> bool {
+        self.preferences.design == crate::model::Design::Retro && self.page == Page::Home
+    }
+
+    /// The Retro Home menu, top to bottom: favorites, then all apps, inputs and both settings.
+    pub fn retro_rows(&self) -> Vec<Target> {
+        let mut rows: Vec<_> = self
+            .dock_apps()
+            .iter()
+            .map(|app| Target::App(app.id.clone()))
+            .collect();
+        rows.extend([
+            Target::Nav(1),
+            Target::InputsMenu,
+            Target::LumaSettings,
+            Target::TvSettings,
+        ]);
+        rows
+    }
+
+    fn retro_direction(&mut self, direction: Direction, controls: &[Control]) {
+        let rows = self.retro_rows();
+        let index = rows.iter().position(|row| *row == self.focus);
+        let next = match (direction, index) {
+            (_, None) => 0,
+            (Direction::Up, Some(index)) => index.saturating_sub(1),
+            (Direction::Down, Some(index)) => (index + 1).min(rows.len() - 1),
+            (Direction::Left | Direction::Right, Some(_)) => return,
+        };
+        self.focus(rows[next].clone(), controls);
+    }
+
+    /// Number keys 1–9 pick the retro menu row with that number on the current menu page.
+    pub fn retro_digit(&mut self, digit: usize) -> Vec<Effect> {
+        if !self.retro_home() || self.overlay.is_some() || self.moving.is_some() || digit == 0 {
+            return vec![];
+        }
+        let rows = self.retro_rows();
+        let page = rows.iter().position(|row| *row == self.focus).unwrap_or(0) / RETRO_ROWS;
+        let Some(row) = rows.get(page * RETRO_ROWS + digit - 1).cloned() else {
+            return vec![];
+        };
+        self.focus = row;
+        self.pointer = false;
+        self.dirty = true;
+        self.activate()
+    }
+
     pub fn open(&mut self, index: usize) {
         self.weather.cancel_search();
         self.page = match index {
@@ -1231,6 +1282,9 @@ impl State {
     }
 
     pub fn first_content(&self) -> Target {
+        if self.retro_home() {
+            return self.retro_rows().swap_remove(0);
+        }
         match self.page {
             Page::Home => self
                 .apps()
@@ -1623,6 +1677,20 @@ impl State {
         ) {
             return vec![];
         }
+        // Retro Home is one vertical list: Up/Down walk it, and in move mode they reorder.
+        let direction = if self.retro_home() && self.overlay.is_none() {
+            if self.moving.is_none() {
+                self.retro_direction(direction, controls);
+                return vec![];
+            }
+            match direction {
+                Direction::Up => Direction::Left,
+                Direction::Down => Direction::Right,
+                Direction::Left | Direction::Right => return vec![],
+            }
+        } else {
+            direction
+        };
         if let Some(id) = self.moving.clone()
             && self.page == Page::Apps
             && !self.dock_apps().iter().any(|app| app.id == id)
@@ -2394,8 +2462,25 @@ impl State {
     /// Holding OK opens a card's menu everywhere; its Move action starts reordering.
     fn cue(&mut self, cue: crate::audio::Cue) {
         if self.preferences.ui_sounds {
-            self.cues.push(cue);
+            self.cues
+                .push(if self.preferences.design == crate::model::Design::Retro {
+                    cue.retro()
+                } else {
+                    cue
+                });
         }
+    }
+
+    /// Tape tracking noise as the retro Home appears, unless sounds or motion are off.
+    pub fn tracking_cue(&mut self) {
+        if !self.preferences.reduced_motion {
+            self.cue(crate::audio::Cue::Tracking);
+        }
+    }
+
+    /// Whether the Retro TV background music should be heard now.
+    pub fn retro_music_playing(&self) -> bool {
+        self.preferences.retro_music && self.retro_home() && !self.launching
     }
 
     /// Remote arrow keys: `direction` plus a Focus click when anything moved, or a Bump when
@@ -3093,6 +3178,13 @@ impl State {
                     }
                     2 => self.preferences.reduced_motion = !self.preferences.reduced_motion,
                     12 => self.preferences.ui_sounds = !self.preferences.ui_sounds,
+                    14 => self.preferences.retro_music = !self.preferences.retro_music,
+                    13 => {
+                        self.preferences.design = self.preferences.design.toggled();
+                        // Leave any Home glide or lens behind: the other design draws no glass.
+                        self.focus_from = None;
+                        self.focus_lifted = None;
+                    }
                     4 => {
                         self.subpage = Some(Subpage::Language);
                         self.focus = Target::Choice(self.preferences.language.index());

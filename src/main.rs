@@ -291,6 +291,22 @@ impl BackButton {
     }
 }
 
+/// The number on a top-row or keypad digit key (only 1–9 reach here).
+fn retro_digit(key: Keycode) -> usize {
+    match key {
+        Keycode::Num1 | Keycode::Kp1 => 1,
+        Keycode::Num2 | Keycode::Kp2 => 2,
+        Keycode::Num3 | Keycode::Kp3 => 3,
+        Keycode::Num4 | Keycode::Kp4 => 4,
+        Keycode::Num5 | Keycode::Kp5 => 5,
+        Keycode::Num6 | Keycode::Kp6 => 6,
+        Keycode::Num7 | Keycode::Kp7 => 7,
+        Keycode::Num8 | Keycode::Kp8 => 8,
+        Keycode::Num9 | Keycode::Kp9 => 9,
+        _ => 0,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn effects(
     effects: Vec<Effect>,
@@ -980,7 +996,10 @@ fn run() -> Result<(), String> {
             .time
             .unwrap_or_else(|| OffsetDateTime::now_utc().to_offset(local_offset));
         // Redraw once per minute, or once per second while seconds are shown.
-        let clock_slot = if state.preferences.show_seconds {
+        // The retro cursor blinks at 1 Hz: one half-second slot per phase.
+        let clock_slot = if state.retro_home() {
+            (now.unix_timestamp_nanos() / view::RETRO_BLINK_NANOS) as i64
+        } else if state.preferences.show_seconds {
             now.unix_timestamp()
         } else {
             now.unix_timestamp() / 60
@@ -1490,6 +1509,29 @@ fn run() -> Result<(), String> {
                             state.options();
                         }
                         Keycode::F5 if !repeat => pending.push(Effect::Reload),
+                        Keycode::Num1
+                        | Keycode::Num2
+                        | Keycode::Num3
+                        | Keycode::Num4
+                        | Keycode::Num5
+                        | Keycode::Num6
+                        | Keycode::Num7
+                        | Keycode::Num8
+                        | Keycode::Num9
+                        | Keycode::Kp1
+                        | Keycode::Kp2
+                        | Keycode::Kp3
+                        | Keycode::Kp4
+                        | Keycode::Kp5
+                        | Keycode::Kp6
+                        | Keycode::Kp7
+                        | Keycode::Kp8
+                        | Keycode::Kp9
+                            if !repeat && !state.text_input_active() =>
+                        {
+                            press = None;
+                            pending = state.retro_digit(retro_digit(key));
+                        }
                         _ => {}
                     }
                 }
@@ -1770,6 +1812,13 @@ fn run() -> Result<(), String> {
                 restart_motion = true;
                 state.dirty = true;
             }
+            // The retro Home cuts in under a burst of tape tracking noise.
+            if options.script.is_empty() && state.retro_home() {
+                state.page_started = Some(Instant::now());
+                restart_motion = true;
+                state.dirty = true;
+                state.tracking_cue();
+            }
             shown_page = state.page;
             shown_section = state.section;
         }
@@ -1796,6 +1845,7 @@ fn run() -> Result<(), String> {
                 .find(|control| control.target == shown_focus)
                 .map(|control| control.rect);
             if options.script.is_empty()
+                && !state.retro_home()
                 && state::ring_target(&state.focus)
                 && state::ring_target(&shown_focus)
                 && let Some(from) = from
@@ -1807,7 +1857,8 @@ fn run() -> Result<(), String> {
             } else {
                 state.focus_from = None;
             }
-            let now = options.script.is_empty().then(Instant::now);
+            // Retro focus jumps: no lens fade and no lift.
+            let now = (options.script.is_empty() && !state.retro_home()).then(Instant::now);
             state.focus_lifted = now;
             state.focus_left = now.map(|now| (shown_focus.clone(), now));
             state.dirty = true;
@@ -1816,6 +1867,8 @@ fn run() -> Result<(), String> {
         for cue in state.cues.drain(..) {
             sounds.play(cue);
         }
+        // Retro TV music: only on the retro Home of the foreground launcher, never over an app.
+        sounds.set_music(visible && focused && state.retro_music_playing());
         let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit)
             || (visible
                 && options
