@@ -271,3 +271,13 @@ Offene Fragen an den Nutzer: welches Ton-Set, welche Musik? Soll die Musik nur a
 - Ursache (vermutet): `SDL_WaitEventTimeout(100 ms)` schläft unter SDL-webOS deutlich länger.
 - Fix 3.8.1: Während der Bildfehler schläft die Hauptschleife selbst in ≤10-ms-Scheiben bis zum nächsten Schritt und pollt SDL nur noch.
   Wegen der Regel für Event-Schleifen-Änderungen: erst Test-IPK am TV, dann veröffentlichen.
+
+## Demo-Video (2026-11-18, Vorschau)
+
+- Wunsch: Demo der UI mit Ton, erst Liquid Glass durchklicken, dann auf Retro umschalten und Retro zeigen.
+- Umsetzung: echte Desktop-Vorschau (Release-Build) in Xvfb in Echtzeit aufgenommen (x11grab 30 fps), gesteuert per xdotool nach festem Zeitplan.
+  Tonspur aus Lumas eigenen Clips zu den protokollierten Tastendrücken (Glass-Klicks, Retro-Beeps, Bandrauschen, Retro-Musik mit 0,8 s Fade-in),
+  gemischt wie in der App und normalisiert. Wetter ist eine feste Test-Messung (Wien 14 °C), die Uhrzeit ist echt (Europe/Vienna).
+- Schnitt: 0,8 s Zoom 0,60→0,99, Aufnahme bis 32,3 s, 2 s Endkarte „Luma for webOS“ mit Luma-Logo (Inter Medium). Laufzeit 34,3 s.
+- Vorschau: 960×540, 30 fps. Nach Freigabe: Endfassung 1920×1080 aus derselben Aufnahme.
+- Werkzeuge (nicht im Repo): `scratchpad/film/tools/record.py`, `audio.py`, `compose.py`, `mark.js`.
