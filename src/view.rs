@@ -942,6 +942,12 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
             out.modal = parent_modal;
         }
     }
+    if state.preferences.design == crate::model::Design::Retro
+        && state.page == Page::Settings
+        && !recents_replaces_page(state)
+    {
+        retro_view::restyle(&mut out, assets, 0);
+    }
     if let Some((notice, _)) = &state.notice {
         toast(&mut out, state, assets, notice);
     }
@@ -2794,6 +2800,17 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                     false,
                 ),
                 (
+                    14,
+                    "retroMusic",
+                    "volume",
+                    Some(if state.preferences.retro_music {
+                        language.t("stateOn")
+                    } else {
+                        language.t("stateOff")
+                    }),
+                    false,
+                ),
+                (
                     2,
                     "reducedMotion",
                     "motion",
@@ -2806,6 +2823,10 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 ),
             ]
             .into_iter()
+            // Background music belongs to the Retro TV design only.
+            .filter(|(index, ..)| {
+                *index != 14 || state.preferences.design == crate::model::Design::Retro
+            })
             .enumerate()
             {
                 row(

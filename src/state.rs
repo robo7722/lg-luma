@@ -2462,8 +2462,25 @@ impl State {
     /// Holding OK opens a card's menu everywhere; its Move action starts reordering.
     fn cue(&mut self, cue: crate::audio::Cue) {
         if self.preferences.ui_sounds {
-            self.cues.push(cue);
+            self.cues
+                .push(if self.preferences.design == crate::model::Design::Retro {
+                    cue.retro()
+                } else {
+                    cue
+                });
         }
+    }
+
+    /// Tape tracking noise as the retro Home appears, unless sounds or motion are off.
+    pub fn tracking_cue(&mut self) {
+        if !self.preferences.reduced_motion {
+            self.cue(crate::audio::Cue::Tracking);
+        }
+    }
+
+    /// Whether the Retro TV background music should be heard now.
+    pub fn retro_music_playing(&self) -> bool {
+        self.preferences.retro_music && self.retro_home() && !self.launching
     }
 
     /// Remote arrow keys: `direction` plus a Focus click when anything moved, or a Bump when
@@ -3161,6 +3178,7 @@ impl State {
                     }
                     2 => self.preferences.reduced_motion = !self.preferences.reduced_motion,
                     12 => self.preferences.ui_sounds = !self.preferences.ui_sounds,
+                    14 => self.preferences.retro_music = !self.preferences.retro_music,
                     13 => {
                         self.preferences.design = self.preferences.design.toggled();
                         // Leave any Home glide or lens behind: the other design draws no glass.

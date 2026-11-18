@@ -332,6 +332,8 @@ pub struct Preferences {
     pub evening_dim: Option<u8>,
     /// Short clicks for remote navigation, OK and Back.
     pub ui_sounds: bool,
+    /// Retro TV design: quiet background music while Home is shown. Off by default.
+    pub retro_music: bool,
 }
 
 /// Start hours offered for evening mode.
@@ -392,6 +394,7 @@ impl Default for Preferences {
             wallpaper_changed: 0,
             evening_dim: None,
             ui_sounds: true,
+            retro_music: false,
         }
     }
 }

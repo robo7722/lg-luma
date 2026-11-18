@@ -290,8 +290,14 @@ panels with bold outlined lettering: favorites first, then all apps, inputs, Lum
 TV settings. A small "monitor" on the left shows the selected app's card and its channel number,
 and the ticker at the bottom carries the weather, the date and key hints. Up / Down move through
 the menu, the number keys 1–9 open the matching row on the current page, and hold **OK** →
-**Move** reorders favorites with Up / Down. The app drawer, Settings and Recent apps keep their
-Liquid Glass look for now.
+**Move** reorders favorites with Up / Down. Luma's Settings keep their layout but switch
+to the same look (blue framed panels, yellow selection, bold lettering, scanlines). The app drawer
+and Recent apps keep their Liquid Glass look for now.
+
+Retro TV has its own synth blips for navigation and a short burst of tape noise when Home
+appears (both follow **Settings → General → Sounds**). **Settings → General → Background music**
+(shown with Retro TV, off by default) plays a quiet smooth-jazz loop while Home is shown; it fades
+out as soon as you open an app or leave Home and resumes where it stopped.
 
 ### Sounds
 

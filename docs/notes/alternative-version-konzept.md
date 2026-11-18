@@ -204,3 +204,41 @@ und die Einstellung noch nicht sichtbar. Je nach Stilentscheidung wird `vhs_home
 - Test: Oben nur „HAUPTMENÜ“ ohne Uhr-/Datums-Panel → vom Nutzer **verworfen** („davor war es besser“).
   Es bleibt beim Titel-Panel „HAUPTMENÜ“ plus Uhr-Panel mit Datum rechts.
 - **Arbeitsregel:** Vor jedem Commit/Push zuerst ein Design-Bild zeigen und das OK abwarten.
+
+## Retro-Töne und Musik über ElevenLabs (2026-11-18, Entwurf, noch nicht freigegeben)
+
+Ablage: `tools/sound-design/retro/` (wird nicht ins IPK gepackt).
+
+- `elevenlabs/`: Rohdateien, Sound Effects v2 (`eleven_text_to_sound_v2`, prompt_influence 0.6), je 2 Kandidaten:
+  focus (Synth-Blip), select (2 steigende Beeps), back (2 fallende Beeps), bump (dumpfes Brummen), tracking (VHS-Rauschen, 0,8 s).
+- `variants/`: zugeschnitten (Stille vorne weg, focus 0,10 s, select/back 0,22 s, bump 0,18 s, tracking 0,45 s), 48 kHz Mono 16 bit,
+  Lautheit (mean volume) an die bisherigen Töne angeglichen: focus −26 dB, select −22,4, back −20,7, bump −18,4, tracking −24, Limiter 0,89.
+- `demo-sounds-1/2.wav`: nachgestellte Bedienung (3× Fokus, Anschlag, Zurück, Fokus, Auswahl, Rauschen) bei halbem Pegel wie in der App.
+- `music/infochannel-1.mp3` (Smooth Jazz, E-Piano, Fretless-Bass, Sax, 90 BPM) und `infochannel-2.mp3` (Synth-Pop/New Age, 100 BPM),
+  je 60 s, `music_v1`.
+- Kosten: Musik ca. 56 Credits pro 60 s, Effekte kaum messbar. Stand: ca. 5.900 Credits übrig (Starter-Tarif, kommerzielle Nutzung laut Tarif erlaubt,
+  vor Veröffentlichung ElevenLabs-Bedingungen prüfen).
+
+Offene Fragen an den Nutzer: welches Ton-Set, welche Musik? Soll die Musik nur auf der Retro-Startseite laufen
+(aus beim App-Start, eigener Schalter, standardmäßig aus)?
+
+## Feedback 3: Uhr und Datum unten links (2026-11-18, Entwurf)
+
+- Oben nur „HAUPTMENÜ“ (Titel-Panel volle Breite). Uhrzeit und Datum stehen jetzt im orangen Feld unten links
+  (vorher „LUMA TV“, Feld auf 460 px verbreitert). Das Datum ist aus der Ticker-Rotation entfernt.
+
+## Entscheidung Töne/Musik (2026-11-18)
+
+- Nutzerwahl: **Ton-Set 1**, **Musik 1** (Smooth Jazz). Der Musikschalter kommt wie vorgeschlagen:
+  nur auf der Retro-Startseite, eigener Schalter unter Allgemein (nur im Retro-Design sichtbar), standardmäßig aus,
+  **stoppt beim App-Start** (sowie beim Verlassen der Startseite und im Hintergrund) und spielt danach an derselben Stelle weiter.
+- Umsetzung: `assets/sounds/retro-{focus,select,back,bump,tracking}.wav`, `retro-music.wav` (24 kHz Mono, ca. 57 s,
+  ca. 2,7 MB, nahtlose Schleife), Mischung im SDL-Audio-Callback (`src/audio.rs`), Einstellung `retro_music`.
+
+## Launcher-Einstellungen im Retro-Look (2026-11-18, Entwurf)
+
+- Wunsch: Im Retro-Modus soll auch das Launcher-Menü (Luma-Einstellungen) den Look bekommen.
+- Umsetzung als Restyle-Filter (`retro_view::restyle`) über die fertige Einstellungs-Szene: Layout, Ziele und Navigation
+  bleiben identisch (Test vergleicht die Controls). Wallpaper → Navy, Glas → blaues Verlaufs-Panel mit hellem Rahmen,
+  fokussiertes Glas → Gelb, Schatten/Glasränder weg, Ecken max. 6 px, Schrift fett (800) mit hartem Schatten und
+  automatisch auf die vorhandene Breite verkleinert, Scanlines. Gilt für alle Bereiche und Unterseiten.

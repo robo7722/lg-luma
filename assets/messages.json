@@ -4860,5 +4860,22 @@
     "sv": "1–9 Snabbval  •  OK Öppna  •  Tillbaka Senaste appar",
     "cs": "1–9 Rychlá volba  •  OK Otevřít  •  Zpět Nedávné aplikace",
     "ca": "1–9 Accés directe  •  OK Obre  •  Enrere Apps recents"
+  },
+  "retroMusic": {
+    "en": "Background music",
+    "de": "Hintergrundmusik",
+    "es": "Música de fondo",
+    "zh": "背景音乐",
+    "zh-tw": "背景音樂",
+    "pt": "Música de fundo",
+    "it": "Musica di sottofondo",
+    "ru": "Фоновая музыка",
+    "pl": "Muzyka w tle",
+    "fr": "Musique de fond",
+    "vi": "Nhạc nền",
+    "nl": "Achtergrondmuziek",
+    "sv": "Bakgrundsmusik",
+    "cs": "Hudba na pozadí",
+    "ca": "Música de fons"
   }
 }

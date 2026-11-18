@@ -53,17 +53,17 @@ Stay inside broadcast-safe values: no pure `#FFFFFF`, no pure `#0000FF`, red onl
 - **Headings / big numbers:** `outlined()`, i.e. five black copies (four diagonals at `size/16`
   clamped 2–6 px, plus a drop shadow) under the coloured text.
 - **Everything else:** `shadowed()`, a single hard black shadow at +3,+3 px.
-- Sizes (logical px): title 64, preview channel 52, menu rows 38, ticker 36, clock 54, date 28.
-- The header keeps the clock panel: the user tried a title-only header and preferred the clock box.
+- Sizes (logical px): title 64, preview channel 52, menu rows 38, ticker 36, clock 34, date 22.
+- The header shows only the title. Clock and date live in the orange ticker label block (0,967 460×74), white with shadow.
 - Long text uses `assets.fit_line` / `fit_text`. Never wrap a row.
 - Non-Latin scripts keep the bundled Noto fonts. `to_uppercase()` is safe for scripts without case.
 
 ## 4. Home layout (1920 × 1080)
 
 ```
-┌ title panel 96,36 1270×140 ──────────────┐ ┌ clock panel 1394,36 430×140 ┐
-│ HAUPTMENÜ (outlined yellow)               │ │   20:41 (white)             │
-└───────────────────────────────────────────┘ │   DONNERSTAG, 22. OKTOBER   │
+┌ title panel 96,36 1728×140 ──────────────────────────────────────────────┐
+│ HAUPTMENÜ (outlined yellow) — nothing else in the header                 │
+└──────────────────────────────────────────────────────────────────────────┘
 ┌ main panel 96,200 1728×740 ──────────────────────────────────────────────┐
 │ ┌ preview 150,252 470×620 ┐   ▶ 01  NETFLIX                              │
 │ │      CH 01              │     02  YOUTUBE                              │
@@ -73,7 +73,7 @@ Stay inside broadcast-safe values: no pure `#FFFFFF`, no pure `#0000FF`, red onl
 │ │      NETFLIX            │     09  LAUNCHER-EINSTELLUNGEN        LUMA   │
 │ └─────────────────────────┘                                      1 / 2  │
 └──────────────────────────────────────────────────────────────────────────┘
-[ LUMA TV ] WIEN: 14 °C, KLARER HIMMEL   ← ticker 0,964 1920×80, message cuts every 8 s
+[ 20:41 / DONNERSTAG, 22. OKTOBER ] WIEN: 14 °C, KLARER HIMMEL   ← ticker 0,964 1920×80, cuts every 8 s
 ```
 
 - Rows: favorites, then All apps (`Nav(1)`), Inputs (`InputsMenu`), Luma settings, TV settings.
@@ -82,18 +82,24 @@ Stay inside broadcast-safe values: no pure `#FFFFFF`, no pure `#0000FF`, red onl
   In move mode the fill is 32 % and the cursor is a steady ↕.
 - Preview: app rows use `app_face` (artwork or curated logo). Other rows use a yellow `.lvec` icon
   (`grid`, `input-hdmi`, `luma-mark`, `tv`) with a black shadow. The screen gets 3 px scanlines and a top glare.
-- Ticker messages: key hints (`retroHint`), weather (only if enabled and read), date.
+- Ticker messages: key hints (`retroHint`) and weather (only if enabled and read). The date is in the label block.
 
 ## 5. Motion and sound
 
 - No easing, no glides: focus jumps, pages cut.
 - Page appearance: one 0.24 s band of tracking noise rolling upward (`glitch()`), skipped with Reduce motion.
-- Sounds currently reuse the normal UI clicks. Retro beeps (`assets/sounds/retro-*.wav`, made in
-  `tools/sound-design/`) are a possible follow-up and must keep the same Sounds toggle.
+- Sounds: `State::cue` swaps Focus/Select/Back/Bump for `Cue::Retro*` synth blips while the design
+  is retro, and entering retro Home plays `Cue::Tracking` (tape noise). All of them follow the Sounds toggle.
+- Background music (`retro-music.wav`, smooth jazz chosen by the user) only plays on retro Home with
+  `retro_music` on (default off). It fades out for app launches, other pages and background, and resumes where it stopped.
+- New sounds: generate with ElevenLabs into `tools/sound-design/retro/`, match the format and levels
+  (see its README), and let the user listen to the candidates before anything is committed.
 
 ## 6. Extending to other pages (next phases)
 
-Order: Recents → app drawer (`Page::Apps`) → Settings. For each page:
+Settings are done via `restyle()` (a filter over the finished Glass scene, see development.md).
+Remaining order: app drawer (`Page::Apps`) → Recents. Either reuse `restyle()` or, for a real
+layout change, follow these steps:
 1. Gate on `state.preferences.design == Design::Retro` in `view::scene`, mirroring `retro_home()`.
 2. Reuse `panel`, `outlined`, `shadowed` and `scanlines` from `retro-view.rs` (make them `pub(super)`).
 3. Keep the targets and controls of the Glass page so `state.rs` navigation keeps working. Only change

@@ -1812,6 +1812,13 @@ fn run() -> Result<(), String> {
                 restart_motion = true;
                 state.dirty = true;
             }
+            // The retro Home cuts in under a burst of tape tracking noise.
+            if options.script.is_empty() && state.retro_home() {
+                state.page_started = Some(Instant::now());
+                restart_motion = true;
+                state.dirty = true;
+                state.tracking_cue();
+            }
             shown_page = state.page;
             shown_section = state.section;
         }
@@ -1860,6 +1867,8 @@ fn run() -> Result<(), String> {
         for cue in state.cues.drain(..) {
             sounds.play(cue);
         }
+        // Retro TV music: only on the retro Home of the foreground launcher, never over an app.
+        sounds.set_music(visible && focused && state.retro_music_playing());
         let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit)
             || (visible
                 && options

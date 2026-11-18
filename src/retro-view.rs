@@ -136,8 +136,8 @@ pub(super) fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetD
         );
     }
 
-    // Header: title box and clock box.
-    let title_box = Rect::new(96., 36., 1270., 140.);
+    // Header: only the title; the clock and date sit in the ticker's label block.
+    let title_box = Rect::new(96., 36., 1728., 140.);
     panel(out, title_box);
     outlined(
         out,
@@ -147,43 +147,11 @@ pub(super) fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetD
         YELLOW,
         false,
     );
-    let clock_box = Rect::new(1394., 36., 430., 140.);
-    panel(out, clock_box);
-    let clock = upper(&language.clock(
-        now,
-        state.preferences.hour_24,
-        state.preferences.show_seconds,
-    ));
-    let clock_style = assets.fit_text(&clock, text(54., 800, 0.), 380.);
-    out.text(
-        clock.clone(),
-        Rect::new(clock_box.x + 3., 61., clock_box.w, 66.),
-        clock_style,
-        c(0x000000, 0.85),
-        true,
-    );
-    out.text(
-        clock,
-        Rect::new(clock_box.x, 58., clock_box.w, 66.),
-        clock_style,
-        rgb(WHITE),
-        true,
-    );
-    let date = upper(&state.preferences.date_format.format(language, now));
-    let date_style = assets.fit_text(&date, text(28., 800, 0.), 380.);
-    out.text(
-        date,
-        Rect::new(clock_box.x, 128., clock_box.w, 36.),
-        date_style,
-        rgb(YELLOW),
-        true,
-    );
-
-    // Main panel: the weather box on the left, the menu on the right.
+    // Main panel: the selected item on the left, the menu on the right.
     panel(out, Rect::new(96., 200., 1728., 740.));
     preview_box(out, state, assets);
     menu(out, state, assets, now);
-    ticker(out, state, now);
+    ticker(out, state, assets, now);
     glitch(out, state);
     scanlines(out);
 }
@@ -369,7 +337,7 @@ fn menu(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     }
 }
 
-fn ticker(out: &mut Scene, state: &State, now: OffsetDateTime) {
+fn ticker(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let language = state.preferences.language;
     let bar = Rect::new(0., 964., 1920., 80.);
     out.shape(bar, 0., rgb(0x0a1550));
@@ -379,16 +347,35 @@ fn ticker(out: &mut Scene, state: &State, now: OffsetDateTime) {
         0.,
         c(FRAME, 0.9),
     );
-    let label = Rect::new(0., bar.y + 3., 336., bar.h - 6.);
+    let label = Rect::new(0., bar.y + 3., 460., bar.h - 6.);
     out.shape(label, 0., rgb(ORANGE));
-    shadowed(
-        out,
-        "LUMA TV",
-        Rect::new(96., bar.y + 18., 230., 46.),
-        38.,
-        rgb(WHITE),
-        false,
-    );
+    let clock = upper(&language.clock(
+        now,
+        state.preferences.hour_24,
+        state.preferences.show_seconds,
+    ));
+    let date = upper(&state.preferences.date_format.format(language, now));
+    let clock_style = assets.fit_text(&clock, text(34., 800, 0.), 344.);
+    let date_style = assets.fit_text(&date, text(22., 800, 0.), 344.);
+    for (value, style, y) in [
+        (clock, clock_style, bar.y + 9.),
+        (date, date_style, bar.y + 47.),
+    ] {
+        out.text(
+            value.clone(),
+            Rect::new(98., y + 2., 344., style.size * 1.3),
+            style,
+            c(0x000000, 0.8),
+            false,
+        );
+        out.text(
+            value,
+            Rect::new(96., y, 344., style.size * 1.3),
+            style,
+            rgb(WHITE),
+            false,
+        );
+    }
     let mut messages = vec![upper(language.t("retroHint"))];
     if let Some(place) = state
         .preferences
@@ -404,13 +391,12 @@ fn ticker(out: &mut Scene, state: &State, now: OffsetDateTime) {
             language.t(weather::condition(reading).key)
         )));
     }
-    messages.push(upper(&state.preferences.date_format.format(language, now)));
     let index =
         (now.unix_timestamp_nanos() / (TICKER_SECONDS * 1_000_000_000)) as usize % messages.len();
     shadowed(
         out,
         &messages[index],
-        Rect::new(376., bar.y + 18., 1450., 46.),
+        Rect::new(500., bar.y + 18., 1324., 46.),
         36.,
         rgb(WHITE),
         false,
@@ -456,4 +442,93 @@ fn scanlines(out: &mut Scene) {
         out.shape(Rect::new(0., y, 1920., 1.5), 0., c(0x000000, 0.12));
         y += 4.;
     }
+}
+
+/// Brightness of a fill, to tell focused (light) glass from ordinary panels.
+fn luminance(color: [f32; 4]) -> f32 {
+    0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2]
+}
+
+/// Retro TV look for a Liquid Glass page (the launcher Settings): the page keeps its layout,
+/// controls and navigation, while its draws are restyled from `from` on. The wallpaper becomes
+/// the navy screen, glass becomes framed blue panels, the focused (light) glass turns yellow,
+/// soft shadows and glass rims go, corners square up, and lettering turns bold with a hard
+/// drop shadow. Scanlines finish the page.
+pub(super) fn restyle(out: &mut Scene, assets: &Assets, from: usize) {
+    use crate::renderer::Draw;
+    let corner = |radius: f32| radius.min(6.);
+    let draws = std::mem::take(&mut out.draw);
+    let mut restyled = Vec::with_capacity(draws.len() * 2);
+    for (index, draw) in draws.into_iter().enumerate() {
+        if index < from {
+            restyled.push(draw);
+            continue;
+        }
+        match draw {
+            Draw::Image(_, rect, ..) | Draw::TintedImage(_, rect, ..)
+                if rect.w >= 1920. && rect.h >= 1080. =>
+            {
+                restyled.push(Draw::Shape(rect, 0., 0., rgb(NAVY)));
+            }
+            Draw::Glass(rect, radius, tint) => {
+                if luminance(tint) > 0.6 {
+                    restyled.push(Draw::Shape(rect, corner(radius), 0., rgb(YELLOW)));
+                } else {
+                    restyled.push(Draw::RoundedGradient(
+                        rect,
+                        corner(radius),
+                        rgb(PANEL_TOP),
+                        rgb(PANEL_BOTTOM),
+                    ));
+                    restyled.push(Draw::Shape(rect, corner(radius), 2., c(FRAME, 0.85)));
+                }
+            }
+            Draw::Rim(rect, radius, ..) => {
+                restyled.push(Draw::Shape(rect, corner(radius), 3., rgb(YELLOW)));
+            }
+            Draw::Shadow(..) => {}
+            Draw::Shape(rect, radius, width, color) => {
+                // Light hairlines around glass read as the panel frame already.
+                if width > 0. && width < 2. && luminance(color) > 0.8 {
+                    continue;
+                }
+                restyled.push(Draw::Shape(rect, corner(radius), width, color));
+            }
+            Draw::RoundedGradient(rect, radius, top, bottom) => {
+                restyled.push(Draw::RoundedGradient(rect, corner(radius), top, bottom));
+            }
+            Draw::Text(label, rect, style, color, center) => {
+                // Bold lettering is wider: shrink it to the box the page laid out, so
+                // nothing that fitted before (the clock, values) gets cut.
+                let mut bold = style;
+                bold.weight = 800;
+                // Only single-line boxes: paragraphs wrap instead.
+                let single_line = rect.h < 2. * style.size * style.line_height;
+                let style =
+                    if single_line && rect.w > 0. && assets.width(&label, bold) > rect.w - 1. {
+                        let fitted = assets.fit_text(&label, bold, rect.w - 1.);
+                        if assets.width(&label, fitted) <= rect.w - 1. {
+                            fitted
+                        } else {
+                            style
+                        }
+                    } else {
+                        bold
+                    };
+                if luminance(color) > 0.5 {
+                    restyled.push(Draw::Text(
+                        label.clone(),
+                        Rect::new(rect.x + 2., rect.y + 2., rect.w, rect.h),
+                        style,
+                        [0., 0., 0., 0.8 * color[3]],
+                        center,
+                    ));
+                }
+                restyled.push(Draw::Text(label, rect, style, color, center));
+            }
+            other => restyled.push(other),
+        }
+    }
+    out.draw = restyled;
+    scanlines(out);
 }
