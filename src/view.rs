@@ -684,6 +684,9 @@ fn companion(
     out.control(Target::CloseDialog, close, false);
 }
 
+/// Half a period of the VHS cursor blink (1 Hz), in nanoseconds.
+pub const VHS_BLINK_NANOS: i128 = 500_000_000;
+
 fn c(rgb: u32, alpha: f32) -> Color {
     [
         ((rgb >> 16) & 255) as f32 / 255.,

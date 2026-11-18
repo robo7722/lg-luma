@@ -259,9 +259,35 @@ impl WeatherStyle {
     }
 }
 
+/// The whole interface's look: Liquid Glass, or a 1990s VCR on-screen display.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Design {
+    #[default]
+    Glass,
+    Vhs,
+}
+
+impl Design {
+    pub fn label_key(self) -> &'static str {
+        match self {
+            Self::Glass => "designGlass",
+            Self::Vhs => "designVhs",
+        }
+    }
+
+    pub fn toggled(self) -> Self {
+        match self {
+            Self::Glass => Self::Vhs,
+            Self::Vhs => Self::Glass,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Preferences {
+    pub design: Design,
     pub weather_style: WeatherStyle,
     pub app_sorting: AppSorting,
     pub app_launch_counts: BTreeMap<String, u64>,
@@ -336,6 +362,7 @@ pub fn evening_dim(start: Option<u8>, hour: u8, minute: u8) -> f32 {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
+            design: Design::default(),
             weather_style: WeatherStyle::default(),
             app_sorting: AppSorting::default(),
             app_launch_counts: BTreeMap::new(),

@@ -160,3 +160,19 @@ Performance auf alten webOS-GPUs muss am TV geprüft werden.
 - `.agents/skills/vhs-look/references/effects.md`: GLES2-Rezepte für Scanlines, Tracking-Glitch, Rauschtextur, Chroma-Saum,
   Vignette, abgestimmt auf Lumas Teil-Neuzeichnung (`src/damage.rs`).
 - `.claude/skills` → Symlink auf `.agents/skills`, damit Claude Code die Projekt-Skills automatisch findet.
+
+## Stilfrage: VCR-OSD vs. „90er Kabel-Wetterkanal“ (2026-11-18)
+
+Der Nutzer hat als Referenz einen Screenshot gezeigt („O'Brien's Weather Station“, YouTube-Stream).
+Das ist **nicht** das VCR-OSD-Menü, sondern der Look der **90er-Jahre-Kabel-TV-Infokanäle**:
+- bekannt als „Local on the 8s“ / WeatherStar-4000-Look (The Weather Channel, ca. 1990–1998)
+- Oberbegriffe: *Retro Broadcast Graphics*, *90s Cable TV Aesthetic*, *Weather Channel Aesthetic*
+- Merkmale: blaue Verlaufs-Panels mit hellem Rahmen/Fase, Kopfzeile mit Titel-Box und Uhr-Box,
+  fette abgerundete Grotesk in Gelb mit dickem schwarzem Rand/Schatten, weiße Labels links + gelbe Werte rechts,
+  Pixel-Art-Icons, Laufschrift-Ticker unten, feine Scanlines.
+- Fan-Nachbau als Open Source: „WeatherStar 4000+“ (Web-Emulation). Nur als Stilreferenz,
+  keine Marken, Logos oder 1:1-Layouts übernehmen.
+
+Zwischenstand Code (WIP, Branch `ccr-39c15a48-9biymt`): `Design`-Präferenz (Glass/Vhs), Übersetzungen,
+vertikale Home-Navigation + Zifferntasten + Blink-Takt sind drin. Die VHS-Ansicht selbst ist noch nicht gebaut
+und die Einstellung noch nicht sichtbar. Je nach Stilentscheidung wird `vhs_home()` als OSD-Liste oder als Broadcast-Panel-Layout gezeichnet.
