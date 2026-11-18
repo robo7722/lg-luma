@@ -150,3 +150,13 @@ Performance auf alten webOS-GPUs muss am TV geprüft werden.
   Der beste Kandidat. Upstream-Quelle und genaue Glyphen-Abdeckung müssen vor der Aufnahme geprüft werden.
   Für CJK/Vietnamesisch auf die bisherige Schrift zurückfallen.
 - VCR OSD Neue: nur „bitte nennen“, keine klare Lizenz → nicht verwenden.
+
+## Skill `vhs-look` angelegt (2026-11-18)
+
+- `.agents/skills/vhs-look/SKILL.md`: Regeln (Idle = nichts animieren, gleiche Navigation, ein Design-Schalter),
+  Palette (`vhs.blue #1418A0`, `vhs.yellow #E8D02E` …, broadcast-safe), OSD-Typografie (Großbuchstaben, Monospace-Raster,
+  harter Schatten), Home-Layout, Bewegung (keine Glides, 1-Hz-Cursor, 180–240 ms Bandwechsel-Glitch), Pieptöne,
+  OLED-Schutz (±2 px Pixel-Shift), Code-Landkarte, Prüfschritte, Verbote.
+- `.agents/skills/vhs-look/references/effects.md`: GLES2-Rezepte für Scanlines, Tracking-Glitch, Rauschtextur, Chroma-Saum,
+  Vignette, abgestimmt auf Lumas Teil-Neuzeichnung (`src/damage.rs`).
+- `.claude/skills` → Symlink auf `.agents/skills`, damit Claude Code die Projekt-Skills automatisch findet.
