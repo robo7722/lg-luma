@@ -997,7 +997,10 @@ fn run() -> Result<(), String> {
             .unwrap_or_else(|| OffsetDateTime::now_utc().to_offset(local_offset));
         // Redraw once per minute, or once per second while seconds are shown.
         // The retro cursor blinks at 1 Hz: one half-second slot per phase.
-        let clock_slot = if state.retro_home() {
+        let clock_slot = if state.retro_faults() {
+            // The hum bar rolls at about 12 fps; partial redraw keeps it to the bar's strip.
+            (now.unix_timestamp_nanos() / view::RETRO_FAULT_NANOS) as i64
+        } else if state.retro_list() {
             (now.unix_timestamp_nanos() / view::RETRO_BLINK_NANOS) as i64
         } else if state.preferences.show_seconds {
             now.unix_timestamp()
@@ -1801,7 +1804,7 @@ fn run() -> Result<(), String> {
                 state.dirty = true;
             }
             // The retro Home cuts in under a burst of tape tracking noise.
-            if options.script.is_empty() && state.retro_home() {
+            if options.script.is_empty() && state.retro_list() {
                 state.page_started = Some(Instant::now());
                 restart_motion = true;
                 state.dirty = true;
@@ -1833,7 +1836,7 @@ fn run() -> Result<(), String> {
                 .find(|control| control.target == shown_focus)
                 .map(|control| control.rect);
             if options.script.is_empty()
-                && !state.retro_home()
+                && !state.retro_list()
                 && state::ring_target(&state.focus)
                 && state::ring_target(&shown_focus)
                 && let Some(from) = from
@@ -1846,7 +1849,7 @@ fn run() -> Result<(), String> {
                 state.focus_from = None;
             }
             // Retro focus jumps: no lens fade and no lift.
-            let now = (options.script.is_empty() && !state.retro_home()).then(Instant::now);
+            let now = (options.script.is_empty() && !state.retro_list()).then(Instant::now);
             state.focus_lifted = now;
             state.focus_left = now.map(|now| (shown_focus.clone(), now));
             state.dirty = true;

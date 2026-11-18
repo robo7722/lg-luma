@@ -98,7 +98,8 @@ fn row_text(state: &State, target: &Target) -> (String, String) {
     match target {
         Target::App(id) => (
             state
-                .dock_apps()
+                .inventory
+                .apps
                 .iter()
                 .find(|app| &app.id == id)
                 .map_or_else(String::new, |app| app.title.clone()),
@@ -124,7 +125,8 @@ fn row_text(state: &State, target: &Target) -> (String, String) {
     }
 }
 
-pub(super) fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
+/// A retro menu page: Home ("Main menu") or All apps, as framed panels with a numbered list.
+pub(super) fn page(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
     let language = state.preferences.language;
     out.shape(Rect::new(0., 0., 1920., 1080.), 0., rgb(NAVY));
     // Faint diagonal broadcast stripes behind the header.
@@ -141,7 +143,11 @@ pub(super) fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetD
     panel(out, title_box);
     outlined(
         out,
-        &upper(language.t("retroMainMenu")),
+        &upper(language.t(if state.page == crate::state::Page::Apps {
+            "retroAllApps"
+        } else {
+            "retroMainMenu"
+        })),
         Rect::new(132., 66., 1200., 80.),
         64.,
         YELLOW,
@@ -154,6 +160,7 @@ pub(super) fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetD
     ticker(out, state, assets, now);
     glitch(out, state);
     scanlines(out);
+    tv_faults(out, now, state.preferences.reduced_motion);
 }
 
 /// The "now selected" box: the focused row's app card or icon, framed like a picture on an
@@ -185,7 +192,7 @@ fn preview_box(out: &mut Scene, state: &State, assets: &Assets) {
     out.shape(screen.inset(-14.), 10., rgb(0x000000));
     out.border(screen.inset(-14.), 10., 3., c(FRAME, 0.9));
     let app = match target {
-        Target::App(id) => state.dock_apps().into_iter().find(|app| &app.id == id),
+        Target::App(id) => state.inventory.apps.iter().find(|app| &app.id == id),
         _ => None,
     };
     if let Some(app) = app {
@@ -531,4 +538,79 @@ pub(super) fn restyle(out: &mut Scene, assets: &Assets, from: usize) {
     }
     out.draw = restyled;
     scanlines(out);
+}
+
+/// Seconds for the hum bar to roll once from the top of the picture to the bottom.
+const HUM_SECONDS: f64 = 9.;
+/// Glitches come at most once per window, at a random moment inside it, for a short burst.
+const GLITCH_WINDOW: f64 = 12.;
+const GLITCH_BURST: f64 = 0.3;
+
+/// SplitMix-style hash: the same window always glitches at the same moment and place.
+fn hash(mut value: u64) -> u64 {
+    value = value.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    value ^ (value >> 31)
+}
+
+fn unit(value: u64) -> f32 {
+    (value % 10_000) as f32 / 10_000.
+}
+
+/// Old-TV picture faults over a retro page: a faint hum bar rolling down the picture and, now
+/// and then, a short burst of tracking noise with a brightness flicker. Everything follows the
+/// clock, so captures are reproducible; nothing is drawn with Reduce motion. Only these draws
+/// change between frames, so partial redraw keeps the per-frame work to the bar's strip.
+pub(super) fn tv_faults(out: &mut Scene, now: OffsetDateTime, reduced_motion: bool) {
+    if reduced_motion {
+        return;
+    }
+    let seconds = now.unix_timestamp_nanos() as f64 / 1e9;
+    // Hum bar: a soft band brightening the lines it passes, 240 px tall with a smooth profile.
+    let travel = 1080. + 480.;
+    let center = ((seconds / HUM_SECONDS).fract() * travel - 240.) as f32;
+    const STRIPS: usize = 12;
+    for strip in 0..STRIPS {
+        let offset = (strip as f32 + 0.5) / STRIPS as f32 * 2. - 1.;
+        let alpha = 0.045 * (1. - offset * offset);
+        out.shape(
+            Rect::new(0., center + offset * 120. - 10., 1920., 20.5),
+            0.,
+            c(0xffffff, alpha),
+        );
+    }
+    // Occasional tracking burst.
+    let window = (seconds / GLITCH_WINDOW).floor();
+    let seed = hash(window as u64);
+    let start = window * GLITCH_WINDOW + f64::from(unit(seed)) * (GLITCH_WINDOW - 1.);
+    let t = seconds - start;
+    if !(0. ..GLITCH_BURST).contains(&t) {
+        return;
+    }
+    let mut state = hash(seed ^ (t * 30.) as u64);
+    let mut random = move || {
+        state = hash(state);
+        unit(state)
+    };
+    // A brief overall flicker, then a band of noisy streaks.
+    out.shape(
+        Rect::new(0., 0., 1920., 1080.),
+        0.,
+        c(0xffffff, 0.02 + 0.03 * random()),
+    );
+    let band = 120. + random() * 760.;
+    for line in 0..10 {
+        let y = band + line as f32 * 7.;
+        let mut x = random() * 200.;
+        while x < 1920. {
+            let w = 20. + random() * 180.;
+            out.shape(
+                Rect::new(x, y, w, 2. + random() * 3.),
+                0.,
+                c(0xffffff, 0.1 + random() * 0.35),
+            );
+            x += w + random() * 160.;
+        }
+    }
 }

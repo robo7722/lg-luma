@@ -21,9 +21,11 @@ Read [references/effects.md](references/effects.md) before touching shaders or a
 ## 1. Non-negotiables
 
 1. **Readable first.** A 32 px label must stay crisp at 3 m. Effects never sit on text above 15 %.
-2. **Idle means idle.** Luma redraws only damaged rects (`src/damage.rs`). At rest only the
-   half-second cursor blink and the ticker's hard cut every 8 s may change. Never animate
-   full-screen noise, rolls or a smoothly scrolling ticker continuously.
+2. **Idle stays cheap.** The user asked for animated old-TV faults, so retro pages redraw at
+   ~12 fps (`RETRO_FAULT_NANOS`) for the hum bar and short tracking bursts (`tv_faults`), all off
+   with Reduce motion. Keep every animated draw small or brief so partial redraw stays cheap.
+   Besides that, only the half-second cursor blink and the ticker's 8 s cut change; never add
+   continuous full-screen animation.
 3. **Same navigation contract.** Back, OK, hold-OK menu, Move, Recents, settings subpages behave as
    in Liquid Glass. Retro pages may change the *shape* (vertical lists), not the semantics.
 4. **No Liquid Glass leftovers** on retro pages (no `Draw::Glass`/`Draw::Rim`, no glide, no lift),
@@ -98,9 +100,10 @@ Stay inside broadcast-safe values: no pure `#FFFFFF`, no pure `#0000FF`, red onl
 ## 6. Extending to other pages (next phases)
 
 Settings are done via `restyle()` (a filter over the finished Glass scene, see development.md).
-Remaining order: app drawer (`Page::Apps`) → Recents. Either reuse `restyle()` or, for a real
+All apps (`Page::Apps`) is done as a retro menu page (`retro_list()`, `page()`). Remaining:
+Recents. Either reuse `restyle()` or, for a real
 layout change, follow these steps:
-1. Gate on `state.preferences.design == Design::Retro` in `view::scene`, mirroring `retro_home()`.
+1. Gate on `state.preferences.design == Design::Retro` in `view::scene`, mirroring `retro_list()`.
 2. Reuse `panel`, `outlined`, `shadowed` and `scanlines` from `retro-view.rs` (make them `pub(super)`).
 3. Keep the targets and controls of the Glass page so `state.rs` navigation keeps working. Only change
    geometry, or add a retro-specific direction branch like `retro_direction`.

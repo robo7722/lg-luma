@@ -162,7 +162,7 @@ to help make Luma available by default.
 On your computer, replace `TV_IP`:
 
 ```sh
-scp -O dist/com.ecklf.luma_3.7.1_arm.ipk root@TV_IP:/tmp/luma.ipk
+scp -O dist/com.ecklf.luma_3.8.0_arm.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -291,13 +291,18 @@ TV settings. A small "monitor" on the left shows the selected app's card and its
 and the ticker at the bottom carries the weather, the date and key hints. Up / Down move through
 the menu, the number keys 1–9 open the matching row on the current page, and hold **OK** →
 **Move** reorders favorites with Up / Down. Luma's Settings keep their layout but switch
-to the same look (blue framed panels, yellow selection, bold lettering, scanlines). The app drawer
-and Recent apps keep their Liquid Glass look for now.
+to the same look (blue framed panels, yellow selection, bold lettering, scanlines). **All apps**
+opens as its own retro page: a numbered list of the drawer's apps with the same monitor preview,
+Up / Down, number keys 1–9 on the current page and Move with Up / Down. Recent apps keep their
+Liquid Glass look for now. Retro pages show gentle old-TV picture faults: a faint hum bar
+rolling down the picture and, now and then, a short burst of tracking noise. **Reduce motion**
+turns them off.
 
 Retro TV has its own synth blips for navigation and a short burst of tape noise when Home
-appears (both follow **Settings → General → Sounds**). **Settings → General → Background music**
-(shown with Retro TV, off by default) plays a quiet smooth-jazz loop while Home is shown; it fades
-out as soon as you open an app or leave Home and resumes where it stopped.
+or All apps appears (both follow **Settings → General → Sounds**). **Settings → General →
+Background music** (shown with Retro TV) turns on when you switch to Retro TV and plays a quiet
+smooth-jazz loop on Home and All apps; it fades out as soon as you open an app or go to Settings,
+and resumes where it stopped. Switch it off there if you prefer silence.
 
 ### Sounds
 
@@ -380,7 +385,7 @@ checksum-pinned SDL-webOS library; both downloads are cached under `.build/`.
 Output:
 
 ```text
-dist/com.ecklf.luma_3.7.1_arm.ipk
+dist/com.ecklf.luma_3.8.0_arm.ipk
 dist/sha256sums
 dist/repo.json
 dist/app-icon-large.png
