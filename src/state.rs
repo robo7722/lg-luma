@@ -114,6 +114,16 @@ pub fn spring(t: f32) -> f32 {
 pub const CYCLE_FADE: f32 = 1.6;
 /// Rows per page of the Retro Home menu; number keys 1–9 address them.
 pub const RETRO_ROWS: usize = 9;
+/// Seconds of the RobOS boot animation after switching to Liquid Glass / to Retro TV.
+pub const GLASS_BOOT: f32 = 1.6;
+pub const RETRO_BOOT: f32 = 1.9;
+
+pub fn boot_seconds(design: crate::model::Design) -> f32 {
+    match design {
+        crate::model::Design::Glass => GLASS_BOOT,
+        crate::model::Design::Retro => RETRO_BOOT,
+    }
+}
 
 pub fn unix_now() -> u64 {
     std::time::SystemTime::now()
@@ -356,6 +366,8 @@ pub struct State {
     pub focus_left: Option<(Target, Instant)>,
     /// UI click cues to play this frame, drained by the event loop.
     pub cues: Vec<crate::audio::Cue>,
+    /// The RobOS boot animation after switching the design: when it started and the new design.
+    pub design_boot: Option<(Instant, crate::model::Design)>,
     /// Start of the glide between Settings sections, set by the event loop.
     pub section_started: Option<Instant>,
     pub weather: weather::Weather,
@@ -411,6 +423,7 @@ impl State {
             focus_lifted: None,
             focus_left: None,
             cues: Vec::new(),
+            design_boot: None,
             section_started: None,
             weather: weather::Weather::default(),
             keyboard_field: TextField::Apps,
@@ -517,6 +530,13 @@ impl State {
                 }
             };
             self.dirty = true;
+        }
+        // The design-switch boot redraws every frame and ends with one clean frame of the page.
+        if let Some((started, design)) = self.design_boot {
+            self.dirty = true;
+            if started.elapsed().as_secs_f32() >= boot_seconds(design) {
+                self.design_boot = None;
+            }
         }
         let recents_open = self.recents_open();
         if recents_open || self.recents.visibility > 0. {
@@ -739,8 +759,16 @@ impl State {
         })
     }
 
+    /// Progress through a running design-switch boot animation, if any.
+    pub fn design_boot_at(&self) -> Option<(f32, crate::model::Design)> {
+        let (started, design) = self.design_boot?;
+        let t = started.elapsed().as_secs_f32();
+        (t < boot_seconds(design)).then_some((t, design))
+    }
+
     pub fn animating(&self) -> bool {
-        self.focus_from.is_some()
+        self.design_boot_at().is_some()
+            || self.focus_from.is_some()
             || self
                 .focus_lifted
                 .is_some_and(|started| started.elapsed().as_secs_f32() < LENS_FADE)
@@ -3208,6 +3236,11 @@ impl State {
                         if self.preferences.design == crate::model::Design::Retro {
                             self.preferences.retro_music = true;
                         }
+                        // A short RobOS boot into the new design, with the logo sound.
+                        if !self.preferences.reduced_motion {
+                            self.design_boot = Some((Instant::now(), self.preferences.design));
+                        }
+                        self.cue(crate::audio::Cue::Boot);
                         // Leave any Home glide or lens behind: the other design draws no glass.
                         self.focus_from = None;
                         self.focus_lifted = None;

@@ -688,8 +688,8 @@ fn companion(
 
 /// Half a period of the retro cursor blink (1 Hz), in nanoseconds.
 pub const RETRO_BLINK_NANOS: i128 = 500_000_000;
-/// Frame step of the retro picture faults (hum bar, tracking bursts): about 12 fps.
-pub const RETRO_FAULT_NANOS: i128 = 83_333_333;
+/// Frame step of the retro picture faults (CRT beam, tracking bursts): 30 fps.
+pub const RETRO_FAULT_NANOS: i128 = 33_333_333;
 
 fn c(rgb: u32, alpha: f32) -> Color {
     [
@@ -953,6 +953,9 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
     }
     if let Some((notice, _)) = &state.notice {
         toast(&mut out, state, assets, notice);
+    }
+    if let Some((t, design)) = state.design_boot_at() {
+        retro_view::design_boot(&mut out, assets, design, t);
     }
     out
 }
@@ -1559,7 +1562,7 @@ fn favorites_dock(out: &mut Scene, state: &State, assets: &Assets) {
         }
     } else if apps.is_empty() {
         let error = state.error.is_some() && state.inventory.apps.is_empty();
-        let favorite_hint = format!("Luma {} → {}", language.t("settings"), language.t("apps"));
+        let favorite_hint = format!("RobOS {} → {}", language.t("settings"), language.t("apps"));
         empty(
             out,
             state,

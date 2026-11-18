@@ -393,3 +393,54 @@ fn tv_faults_move_with_the_clock_and_stop_with_reduced_motion() {
     state.preferences.design = Design::Glass;
     assert!(!state.retro_faults());
 }
+
+#[test]
+fn switching_the_design_plays_the_robos_boot() {
+    use crate::audio::Cue;
+    let mut state = ready();
+    state.open(2);
+    state.cues.clear();
+    state.focus = Target::Setting(13);
+    state.activate();
+    let (_, design) = state.design_boot.expect("boot after switching to Retro");
+    assert_eq!(design, Design::Retro);
+    assert!(state.design_boot_at().is_some());
+    assert!(state.animating(), "the boot animates");
+    assert!(state.cues.contains(&Cue::Boot));
+    // Mid-boot, after the CRT power-on, the RobOS mark is on screen.
+    state.design_boot = Some((
+        std::time::Instant::now() - std::time::Duration::from_millis(1000),
+        Design::Retro,
+    ));
+    let boot = scene(&state);
+    assert!(boot.draw.iter().any(|draw| matches!(draw,
+        Draw::TintedImage(path, ..) if path.ends_with("robos-mark.lvec"))));
+    // Back to Liquid Glass boots too; with Reduce motion only the sound plays.
+    state.preferences.reduced_motion = true;
+    state.design_boot = None;
+    state.cues.clear();
+    state.activate();
+    assert_eq!(state.preferences.design, Design::Glass);
+    assert!(state.design_boot.is_none());
+    assert!(state.cues.contains(&Cue::Boot));
+}
+
+#[test]
+fn the_boot_keeps_redrawing_and_ends_on_the_page() {
+    let mut state = ready();
+    state.design_boot = Some((std::time::Instant::now(), Design::Glass));
+    state.dirty = false;
+    state.tick();
+    assert!(state.dirty, "every boot frame is drawn");
+    state.design_boot = Some((
+        std::time::Instant::now() - std::time::Duration::from_secs(3),
+        Design::Glass,
+    ));
+    state.dirty = false;
+    state.tick();
+    assert!(state.design_boot.is_none());
+    assert!(
+        state.dirty,
+        "one more frame shows the page without the overlay"
+    );
+}

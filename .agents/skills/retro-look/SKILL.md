@@ -22,7 +22,7 @@ Read [references/effects.md](references/effects.md) before touching shaders or a
 
 1. **Readable first.** A 32 px label must stay crisp at 3 m. Effects never sit on text above 15 %.
 2. **Idle stays cheap.** The user asked for animated old-TV faults, so retro pages redraw at
-   ~12 fps (`RETRO_FAULT_NANOS`) for the hum bar and short tracking bursts (`tv_faults`), all off
+   30 fps (`RETRO_FAULT_NANOS`) for the CRT beam and short tracking bursts (`tv_faults`), all off
    with Reduce motion. Keep every animated draw small or brief so partial redraw stays cheap.
    Besides that, only the half-second cursor blink and the ticker's 8 s cut change; never add
    continuous full-screen animation.

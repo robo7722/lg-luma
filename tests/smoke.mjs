@@ -469,7 +469,7 @@ try {
   assert.deepEqual(textRendering.focus, { Choice: 0 });
   assert.ok(textRendering.ui_text.includes('MSAA (default)'));
   assert.ok(textRendering.ui_text.includes('Analytic'));
-  assert.ok(textRendering.ui_text.includes('Restart Luma to apply changes.'));
+  assert.ok(textRendering.ui_text.includes('Restart RobOS to apply changes.'));
   const analyticSaved = await scenario('text-rendering-saved', `${textOptions},down,enter`);
   assert.equal(analyticSaved.preferences.text_rendering, 'analytic');
   assert.deepEqual(analyticSaved.focus, { Setting: 7 });

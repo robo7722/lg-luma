@@ -119,7 +119,7 @@ fn row_text(state: &State, target: &Target) -> (String, String) {
                 .count()
                 .to_string(),
         ),
-        Target::LumaSettings => (language.t("launcherSettings").into(), "LUMA".into()),
+        Target::LumaSettings => (language.t("launcherSettings").into(), "ROBOS".into()),
         Target::TvSettings => (language.t("deviceSettings").into(), "TV".into()),
         _ => (String::new(), String::new()),
     }
@@ -540,8 +540,8 @@ pub(super) fn restyle(out: &mut Scene, assets: &Assets, from: usize) {
     scanlines(out);
 }
 
-/// Seconds for the hum bar to roll once from the top of the picture to the bottom.
-const HUM_SECONDS: f64 = 9.;
+/// Seconds for the CRT beam to sweep once from the top of the picture to the bottom.
+const BEAM_SECONDS: f64 = 6.;
 /// Glitches come at most once per window, at a random moment inside it, for a short burst.
 const GLITCH_WINDOW: f64 = 12.;
 const GLITCH_BURST: f64 = 0.3;
@@ -558,28 +558,29 @@ fn unit(value: u64) -> f32 {
     (value % 10_000) as f32 / 10_000.
 }
 
-/// Old-TV picture faults over a retro page: a faint hum bar rolling down the picture and, now
+/// Old-TV picture faults over a retro page: a CRT beam with a short afterglow sweeping down the picture and, now
 /// and then, a short burst of tracking noise with a brightness flicker. Everything follows the
 /// clock, so captures are reproducible; nothing is drawn with Reduce motion. Only these draws
-/// change between frames, so partial redraw keeps the per-frame work to the bar's strip.
+/// change between frames, so partial redraw keeps the per-frame work to the beam's strip.
 pub(super) fn tv_faults(out: &mut Scene, now: OffsetDateTime, reduced_motion: bool) {
     if reduced_motion {
         return;
     }
     let seconds = now.unix_timestamp_nanos() as f64 / 1e9;
-    // Hum bar: a soft band brightening the lines it passes, 240 px tall with a smooth profile.
-    let travel = 1080. + 480.;
-    let center = ((seconds / HUM_SECONDS).fract() * travel - 240.) as f32;
-    const STRIPS: usize = 12;
-    for strip in 0..STRIPS {
-        let offset = (strip as f32 + 0.5) / STRIPS as f32 * 2. - 1.;
-        let alpha = 0.045 * (1. - offset * offset);
+    // CRT beam: a thin bright scan line sweeping down, with a fading afterglow above it that
+    // lights the scanlines it has just passed. Only this strip changes from frame to frame.
+    let travel = 1080. + 260.;
+    let beam = ((seconds / BEAM_SECONDS).fract() * travel - 40.) as f32;
+    const GLOW: usize = 14;
+    for strip in 0..GLOW {
+        let fade = 1. - strip as f32 / GLOW as f32;
         out.shape(
-            Rect::new(0., center + offset * 120. - 10., 1920., 20.5),
+            Rect::new(0., beam - (strip + 1) as f32 * 12., 1920., 12.5),
             0.,
-            c(0xffffff, alpha),
+            c(0xbfd4ff, 0.05 * fade * fade),
         );
     }
+    out.shape(Rect::new(0., beam - 1.5, 1920., 3.), 0., c(0xe6efff, 0.16));
     // Occasional tracking burst.
     let window = (seconds / GLITCH_WINDOW).floor();
     let seed = hash(window as u64);
@@ -612,5 +613,203 @@ pub(super) fn tv_faults(out: &mut Scene, now: OffsetDateTime, reduced_motion: bo
             );
             x += w + random() * 160.;
         }
+    }
+}
+
+/// The RobOS boot after switching the design: to Liquid Glass a calm glow and the logo on
+/// black; to Retro TV a CRT power-on (a line opening into the blue screen) and the logo in
+/// broadcast lettering. Drawn over the page; the new design is already live underneath.
+pub(super) fn design_boot(out: &mut Scene, assets: &Assets, design: crate::model::Design, t: f32) {
+    let ease = |x: f32| {
+        let x = x.clamp(0., 1.);
+        x * x * (3. - 2. * x)
+    };
+    let start = out.draw.len();
+    let full = Rect::new(0., 0., 1920., 1080.);
+    let total = crate::state::boot_seconds(design);
+    // Liquid Glass fades out at the end; Retro TV cuts away through a VHS glitch instead.
+    let fade_out = match design {
+        crate::model::Design::Glass => 1. - ease((t - (total - 0.38)) / 0.38),
+        crate::model::Design::Retro => 1.,
+    };
+    let glitch_from = total - VHS_CUT;
+    if design == crate::model::Design::Retro && t >= glitch_from + VHS_CUT * 0.45 {
+        // Second half of the glitch: the boot picture is gone, the page shows under the noise.
+        vhs_cut(out, (t - glitch_from) / VHS_CUT);
+        return;
+    }
+    match design {
+        crate::model::Design::Glass => {
+            out.shape(full, 0., rgb(0x000000));
+            // A soft blue glow behind the mark, swelling slowly.
+            let swell = ease(t / 1.2);
+            // Many faint layers make a smooth falloff without visible rings.
+            for ring in 0..28 {
+                let r = (220. + ring as f32 * 22.) * (0.85 + 0.15 * swell);
+                out.shape(
+                    Rect::new(780. - r, 540. - r * 0.8, 2. * r, 1.6 * r),
+                    r * 0.8,
+                    c(0x3c5cff, 0.011 * swell),
+                );
+            }
+            let a = ease((t - 0.15) / 0.35);
+            let grow = 0.92 + 0.08 * ease((t - 0.15) / 0.6);
+            logo(out, assets, a, grow, false);
+        }
+        crate::model::Design::Retro => {
+            out.shape(full, 0., rgb(0x000000));
+            // CRT power-on: a bright line opens across the screen, then into the picture.
+            let line = ease((t - 0.08) / 0.18);
+            let open = ease((t - 0.28) / 0.2);
+            if open < 1. && line > 0. {
+                let w = 1920. * line;
+                out.shape(
+                    Rect::new(960. - w / 2., 538., w, 4.),
+                    2.,
+                    c(0xf2f6ff, 1. - open),
+                );
+            }
+            if open > 0. {
+                let h = 1080. * open;
+                let picture = Rect::new(0., 540. - h / 2., 1920., h);
+                const BANDS: usize = 12;
+                for band in 0..BANDS {
+                    let bh = picture.h / BANDS as f32;
+                    out.shape(
+                        Rect::new(0., picture.y + band as f32 * bh, 1920., bh + 0.5),
+                        0.,
+                        mix(PANEL_TOP, PANEL_BOTTOM, band as f32 / (BANDS - 1) as f32),
+                    );
+                }
+                // A white flash as the picture comes up.
+                out.shape(picture, 0., c(0xffffff, 0.5 * (1. - open)));
+            }
+            let a = ease((t - 0.5) / 0.25);
+            logo(out, assets, a, 1., true);
+            scanlines(out);
+            if t >= glitch_from {
+                vhs_cut(out, (t - glitch_from) / VHS_CUT);
+            }
+        }
+    }
+    out.fade(start, fade_out, 1.);
+}
+
+/// Length of the VHS glitch that ends the Retro TV boot, in seconds.
+const VHS_CUT: f32 = 0.34;
+
+/// A hard VHS tracking glitch over the whole screen (`p` runs 0 → 1): tear bars, dense noise
+/// lines and a brightness flicker, strongest in the middle where the picture jumps.
+fn vhs_cut(out: &mut Scene, p: f32) {
+    let p = p.clamp(0., 1.);
+    let strength = 1. - (2. * p - 1.).abs() * 0.7;
+    let mut seed = 0x2545_f491_u32 ^ ((p * 24.) as u32).wrapping_mul(0x9e37_79b9);
+    let mut random = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        (seed % 1000) as f32 / 1000.
+    };
+    // Flicker: alternately darker and brighter frames.
+    let flash = if ((p * 24.) as u32) & 1 == 0 {
+        0xffffff
+    } else {
+        0x000000
+    };
+    out.shape(
+        Rect::new(0., 0., 1920., 1080.),
+        0.,
+        c(flash, 0.12 * strength),
+    );
+    // A few wide tear bars, like the picture losing sync.
+    for _ in 0..3 {
+        let y = random() * 1080.;
+        let h = 20. + random() * 70.;
+        out.shape(
+            Rect::new(0., y, 1920., h),
+            0.,
+            c(0x9fb2ff, (0.18 + random() * 0.2) * strength),
+        );
+        out.shape(
+            Rect::new(0., y + h, 1920., 4.),
+            0.,
+            c(0x000000, 0.6 * strength),
+        );
+    }
+    // Dense broken noise lines across the screen.
+    for _ in 0..34 {
+        let y = random() * 1080.;
+        let mut x = random() * 200. - 200.;
+        while x < 1920. {
+            let w = 30. + random() * 260.;
+            out.shape(
+                Rect::new(x, y, w, 3. + random() * 5.),
+                0.,
+                c(0xffffff, (0.2 + random() * 0.5) * strength),
+            );
+            x += w + random() * 160.;
+        }
+    }
+}
+
+/// The RobOS mark and wordmark, centred: soft Inter for Glass, outlined capitals for Retro.
+fn logo(out: &mut Scene, assets: &Assets, alpha: f32, grow: f32, retro: bool) {
+    if alpha <= 0. {
+        return;
+    }
+    let mark = 170. * grow;
+    let size = 120. * grow;
+    let (rob, os) = if retro { ("ROB", "OS") } else { ("Rob", "OS") };
+    let style = if retro {
+        text(size, 800, 0.)
+    } else {
+        text(size, 500, -0.02)
+    };
+    let wide = assets.width(rob, style) + assets.width(os, style);
+    let gap = 40. * grow;
+    let x = 960. - (mark + gap + wide) / 2.;
+    out.icon(
+        assets,
+        "robos-mark",
+        Rect::new(x, 540. - mark / 2., mark, mark),
+        c(0xffffff, alpha),
+    );
+    let tx = x + mark + gap;
+    let ty = 540. - size * 0.62;
+    let rob_w = assets.width(rob, style);
+    if retro {
+        let start = out.draw.len();
+        outlined(
+            out,
+            rob,
+            Rect::new(tx, ty, rob_w + 20., size * 1.3),
+            size,
+            WHITE,
+            false,
+        );
+        outlined(
+            out,
+            os,
+            Rect::new(tx + rob_w, ty, wide, size * 1.3),
+            size,
+            YELLOW,
+            false,
+        );
+        out.fade(start, alpha, 1.);
+    } else {
+        out.text(
+            rob,
+            Rect::new(tx, ty, rob_w + 20., size * 1.3),
+            style,
+            c(0xf5f5f5, alpha),
+            false,
+        );
+        out.text(
+            os,
+            Rect::new(tx + rob_w, ty, wide, size * 1.3),
+            style,
+            c(YELLOW, alpha),
+            false,
+        );
     }
 }
