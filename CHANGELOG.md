@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.9.0
+
+### Minor Changes
+
+- The launcher is now called RobOS (same app ID, updates in place). Switching the design plays a short RobOS boot animation with the logo sound, switching to Retro TV ends in a VHS glitch cut, the Retro TV picture fault is now a smooth 30 fps CRT beam, and the Retro TV music loops seamlessly on the beat.
+
 ## 3.8.1
 
 ### Patch Changes

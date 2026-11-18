@@ -1,10 +1,10 @@
 {
   "id": "com.ecklf.luma",
-  "version": "3.8.1",
+  "version": "3.9.0",
   "vendor": "Luma",
   "type": "native",
   "main": "luma",
-  "title": "Luma",
+  "title": "RobOS",
   "icon": "app-icon.png",
   "largeIcon": "app-icon-large.png",
   "appDescription": "A remote-first native webOS launcher.",

@@ -162,7 +162,7 @@ to help make Luma available by default.
 On your computer, replace `TV_IP`:
 
 ```sh
-scp -O dist/com.ecklf.luma_3.8.1_arm.ipk root@TV_IP:/tmp/luma.ipk
+scp -O dist/com.ecklf.luma_3.9.0_arm.ipk root@TV_IP:/tmp/luma.ipk
 ssh root@TV_IP
 ```
 
@@ -294,8 +294,8 @@ the menu, the number keys 1–9 open the matching row on the current page, and h
 to the same look (blue framed panels, yellow selection, bold lettering, scanlines). **All apps**
 opens as its own retro page: a numbered list of the drawer's apps with the same monitor preview,
 Up / Down, number keys 1–9 on the current page and Move with Up / Down. Recent apps keep their
-Liquid Glass look for now. Retro pages show gentle old-TV picture faults: a faint hum bar
-rolling down the picture and, now and then, a short burst of tracking noise. **Reduce motion**
+Liquid Glass look for now. Retro pages show gentle old-TV picture faults: a soft CRT beam
+sweeping down the picture and, now and then, a short burst of tracking noise. **Reduce motion**
 turns them off.
 
 Retro TV has its own synth blips for navigation and a short burst of tape noise when Home
@@ -385,7 +385,7 @@ checksum-pinned SDL-webOS library; both downloads are cached under `.build/`.
 Output:
 
 ```text
-dist/com.ecklf.luma_3.8.1_arm.ipk
+dist/com.ecklf.luma_3.9.0_arm.ipk
 dist/sha256sums
 dist/repo.json
 dist/app-icon-large.png

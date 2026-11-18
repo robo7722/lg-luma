@@ -24,10 +24,12 @@ pub enum Cue {
     RetroBump,
     /// Retro TV design: a short burst of tape tracking noise as Home appears.
     Tracking,
+    /// The RobOS logo sting under the boot animation after switching the design.
+    Boot,
 }
 
 impl Cue {
-    const ALL: [Self; 10] = [
+    const ALL: [Self; 11] = [
         Self::Focus,
         Self::Select,
         Self::Back,
@@ -38,6 +40,7 @@ impl Cue {
         Self::RetroBack,
         Self::RetroBump,
         Self::Tracking,
+        Self::Boot,
     ];
 
     /// The Retro TV design's version of a click; other cues are shared.
@@ -58,6 +61,7 @@ impl Cue {
             * match self {
                 Self::Glide => 0.3,
                 Self::Tracking => 0.6,
+                Self::Boot => 1.4,
                 _ => 1.,
             }
     }
@@ -78,6 +82,7 @@ impl Cue {
             Self::RetroBack => include_bytes!("../assets/sounds/retro-back.wav"),
             Self::RetroBump => include_bytes!("../assets/sounds/retro-bump.wav"),
             Self::Tracking => include_bytes!("../assets/sounds/retro-tracking.wav"),
+            Self::Boot => include_bytes!("../assets/sounds/robos-boot.wav"),
         }
     }
 }
@@ -364,6 +369,7 @@ mod tests {
             // half a second for the tracking noise that covers the Home cut.
             let limit = match cue {
                 Cue::Tracking => CLIP_RATE as usize / 2,
+                Cue::Boot => CLIP_RATE as usize * 7 / 2,
                 Cue::RetroFocus | Cue::RetroSelect | Cue::RetroBack | Cue::RetroBump => {
                     CLIP_RATE as usize / 4
                 }

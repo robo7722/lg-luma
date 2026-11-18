@@ -33,3 +33,12 @@ Sources behind `assets/sounds/retro-*.wav`. Nothing in here is shipped in the IP
 - Music: downmixed to 24 kHz mono, near-silence trimmed, the last 3 s crossfaded into the first 3 s
   (seamless loop), peak-normalised to 0.89. The launcher mixes it at 0.14.
 - `demo-sounds-{1,2}.wav`: navigation demos used for the choice.
+
+## 3.9.0 changes
+
+- `retro-music.wav` re-cut on the beat: tempo 89.5 BPM (onset autocorrelation), loop of 18 bars from
+  5.117 s to 53.385 s of `music/infochannel-1.mp3` (48.27 s), chosen by comparing the spectra around both
+  seams; 50 ms blend into the seam, 24 kHz mono, peak 0.89.
+- `robos-boot.wav` (design-switch boot) is the RobOS logo sting: `elevenlabs/logo-1.mp3` with an echo
+  tail to 3.2 s (`aecho`), 48 kHz mono.
+- `elevenlabs/card-*` and `logo-*` are the other logo-sound candidates (not shipped).

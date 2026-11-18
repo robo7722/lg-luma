@@ -281,3 +281,55 @@ Offene Fragen an den Nutzer: welches Ton-Set, welche Musik? Soll die Musik nur a
 - Schnitt: 0,8 s Zoom 0,60→0,99, Aufnahme bis 32,3 s, 2 s Endkarte „Luma for webOS“ mit Luma-Logo (Inter Medium). Laufzeit 34,3 s.
 - Vorschau: 960×540, 30 fps. Nach Freigabe: Endfassung 1920×1080 aus derselben Aufnahme.
 - Werkzeuge (nicht im Repo): `scratchpad/film/tools/record.py`, `audio.py`, `compose.py`, `mark.js`.
+
+## RobOS: Name, Logo, Demo, Werbevideo (2026-11-18)
+
+- **Umbenennung (lokal, noch nicht freigegeben):** Anzeigename „RobOS“ (appinfo `title`, Texte mit „Luma“ in allen Sprachen,
+  Retro-Wert „ROBOS“, Fenstertitel, Handy-Seiten). App-ID `com.ecklf.luma`, Programm, Pfade, Takeover, Update-Feed und Header bleiben gleich.
+- **Logo:** Variante **B2** gewählt: Glas-Planet mit Ring im Verlauf Hellblau → Retro-Gelb, Schriftzug „Rob“ weiß + „OS“ gelb (Inter Medium).
+  Bedeutung: eigene TV-Welt (OS); Glas = Liquid Glass, Ring = Orbit/Verbindung zwischen Glass und Retro.
+  Quellen: `scratchpad/robos/vb/b2.svg`, Animation `scratchpad/robos/card-anim.js` (Kugel ploppt, Ring zieht sich, Schriftzug gleitet, Glanz).
+- **Logo-Sound:** Kandidat 1 (`tools/sound-design/retro/elevenlabs/logo-1.mp3`) gewählt, mit Nachhall bis Kartenende verlängert,
+  Animation auf den Höhepunkt (0,75 s) gelegt.
+- **Demo-Video 720p** fertig (35,5 s): Zeitlupen-Aufnahme (faketime ×¼) für flüssige Animationen, 180°-Shutter-Mittelung,
+  Endkarte mit animiertem Logo + Sound.
+- **Werbevideo (in Arbeit):** 1080p, deutsch, weibliche Sprecherin (ElevenLabs; Kandidaten Matilda, Lily, Jessica),
+  Texteinblendungen, Musik modern → Retro-Jazz, Logo am Anfang und Ende, ca. 35 s.
+
+### Werbespot v2 (Vorschau, 37 s)
+
+- Stil Glass-Teil angelehnt an hochwertige Produktfilme (nur Stil, keine fremden Marken): schwebender 3D-Bildschirm über
+  fließendem Aurora-Verlauf, langsame Makro-Fahrten auf 4K-Standbildern mit Schärfentiefe, Bildschirm-Karussell, große
+  Schlagworte. Retro-Teil im eigenen Röhren-Stil mit „RETRO TV“-Titelkarte.
+- Ablauf: Logo-Intro → „Liquid Glass“-Titel → schwebende Startseite → Makro Glas-Kachel → App-Schublade → Makro Wetter/Eingänge →
+  Bing-Galerie (3D) → Makro Bing-Kachel → Karussell + „Keine Werbung.“ → Design-Schalter (Zoom) → „RETRO TV“ → Retro-Startseite →
+  Makro Retro-Monitor → Alle Apps (DIREKTWAHL, MUSIK) → Logo-Outro mit Leuchten.
+- Sprecherin Lily (ElevenLabs, multilingual v2, stability .35, style .55), „Rob, Oh-Ess“ aus Zeile 1 auch fürs Ende ausgeschnitten,
+  alle Zeilen 10 % schneller (atempo 1.1). Schlagworte statt Sätze. Wetter-Ort München. Bing nur als kleine Kachel (Bildrechte).
+- Musik: moderner Track (ElevenLabs Music) bis zum Umschalten, dann Retro-Jazz; Musik unter der Stimme abgesenkt.
+- Werkzeuge: `scratchpad/ad/ad2.py`, Titel `scratchpad/ad/gfx/titles.js`, 4K-Details `scratchpad/ad/detail/`.
+
+### Werbespot v3 (Vorschau, 44,5 s) – Feedback umgesetzt
+
+- Titel „Liquid Glass“ endet direkt nach dem gesprochenen „Liquid Glass“ (Forced Alignment: Wortende ~1,5 s).
+- Ab ~6 s echte Wechsel-Animation (Fokus gleitet über die Apps) als 4K-Nahaufnahme: eigene Aufnahme in 3840×2160 bei 1/24 Geschwindigkeit,
+  Kamera folgt der Auswahl, Klick-Töne aus den protokollierten Tasten.
+- 1 s Vorlauf vor dem Öffnen der App-Übersicht; „Klick“ fällt auf das Öffnen.
+- Kein Schnitt mehr zwischen Wetter und Eingängen; keine eigenen Einblendungen mehr (nur Titelkarten „Liquid Glass“ und „RETRO TV“).
+- VHS-Flimmern (Zeilenriss, Farbversatz, Rauschbänder, Helligkeitsflackern, Bildrollen) beim Übergang zu Retro TV.
+- Längere Einstellungen; Gesamtlänge 44,5 s. Werkzeug: `scratchpad/ad/ad3.py`.
+
+## 3.9.0 (lokal, Entwurf): flüssiger, Bildstrahl, Boot-Animation, taktgenaue Musik, RobOS
+
+- Nutzer-Test 3.8.1: läuft, soll noch flüssiger sein.
+- Entscheidungen (Fragen beantwortet): Boot-Animation **beim Design-Wechsel**; Musik: **Retro-Jazz taktgenau**; Name **RobOS**;
+  Scanlines: **Bildstrahl**.
+- Umgesetzt: Retro-Effekte mit 30 fps; Bildstrahl (helle Linie mit Nachleuchten, 6 s pro Durchlauf) statt Brummbalken;
+  Boot-Animation mit `robos-mark`-Vektorlogo (Glass: Leuchten + Logo 1,6 s; Retro: Röhren-Einschaltlinie + Logo 1,9 s) und Logo-Sound;
+  Retro-Loop auf 18 Takte bei 89,5 BPM (48,27 s) geschnitten, Nahtstelle per Spektralvergleich gewählt.
+- Gefundener Fehler beim Bauen: Boot zeichnete nicht neu (fehlendes `dirty` in `tick`), Bild blieb schwarz → behoben, Test ergänzt.
+- Vorschau-Video: `scratchpad/boot/robos-boot-preview.mp4`. Noch nicht hochgeladen.
+- Nutzerwunsch: Wechsel zu Retro soll nicht ausfaden, sondern mit VHS-Störer springen → `vhs_cut` (0,34 s): Reißbalken,
+  dichte Rauschlinien, Hell-Dunkel-Flackern; nach der Hälfte ist das Boot-Bild weg und die Retro-Seite liegt unter dem Störer.
+  Glass blendet weiter weich aus.
+- Freigabe ohne Vorschaubild („du hast die Erlaubnis“), als 3.9.0 gepusht → Test-IPK über PR, Merge erst nach TV-Test.

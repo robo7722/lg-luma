@@ -774,7 +774,7 @@ fn run() -> Result<(), String> {
         Size::new(1280, 720)
     });
     let create_window = || {
-        let mut builder = video.window("Luma", requested.width, requested.height);
+        let mut builder = video.window("RobOS", requested.width, requested.height);
         builder.opengl().allow_highdpi().position_centered();
         if options.fullscreen || (webos && options.resolution.is_none()) {
             builder.fullscreen_desktop();
@@ -998,7 +998,7 @@ fn run() -> Result<(), String> {
         // Redraw once per minute, or once per second while seconds are shown.
         // The retro cursor blinks at 1 Hz: one half-second slot per phase.
         let clock_slot = if state.retro_faults() {
-            // The hum bar rolls at about 12 fps; partial redraw keeps it to the bar's strip.
+            // The CRT beam sweeps at 30 fps; partial redraw keeps it to the beam's strip.
             (now.unix_timestamp_nanos() / view::RETRO_FAULT_NANOS) as i64
         } else if state.retro_list() {
             (now.unix_timestamp_nanos() / view::RETRO_BLINK_NANOS) as i64
@@ -2049,7 +2049,7 @@ fn run() -> Result<(), String> {
         } else {
             100
         };
-        // Retro TV picture faults step at about 12 fps without any input. SDL-webOS's timed wait
+        // Retro TV picture faults step at 30 fps without any input. SDL-webOS's timed wait
         // can sleep about a second on TVs (the faults then only moved with the pointer), so
         // sleep here in short slices until the next step instead, and only poll SDL.
         let timeout = if timeout > 0 && visible && state.retro_faults() {

@@ -1042,7 +1042,7 @@ fn text_rendering_choices_persist_and_back_restores_the_system_row() {
     assert_eq!(state.focus, Target::Choice(0));
     assert!(scene(&state).draw.iter().any(|draw| matches!(
         draw,
-        crate::renderer::Draw::Text(label, ..) if label == "Restart Luma to apply changes."
+        crate::renderer::Draw::Text(label, ..) if label == "Restart RobOS to apply changes."
     )));
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Choice(1));

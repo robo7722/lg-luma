@@ -417,11 +417,11 @@ keys call `State::retro_digit`. Focus jumps without glide or lift. The event loo
 becomes half a second on retro Home, so only the blinking cursor (and the ticker, which cuts to
 its next message every 8 s) changes while idle; damage tracking keeps those redraws partial. A
 0.24 s band of tracking noise plays while the Home page glide runs (none with Reduce motion).
-Scanlines are static 1.5 px fills every 4 logical px. `retro_view::tv_faults` adds a faint hum bar
-(12 full-width strips, peak 4.5 % white, one roll per 9 s) and, once per 12 s window at a hashed
+Scanlines are static 1.5 px fills every 4 logical px. `retro_view::tv_faults` adds a CRT beam
+(a 3 px line at 16 % with a 14-strip afterglow above it, one sweep per 6 s) and, once per 12 s window at a hashed
 moment, a 0.3 s tracking burst (2–5 % flicker plus a band of noisy streaks). Both follow the clock,
 so `--time` captures are reproducible. With `State::retro_faults()` (Retro, no Reduce motion, no
-Recents) the event loop's redraw slot is `RETRO_FAULT_NANOS` (~12 fps). SDL-webOS's
+Recents) the event loop's redraw slot is `RETRO_FAULT_NANOS` (30 fps). SDL-webOS's
 `SDL_WaitEventTimeout` can sleep about a second on TVs, so while faults run the loop sleeps itself
 in slices of at most 10 ms until the next step and only polls SDL (timeout 0); damage tracking limits
 each frame to the bar's strip and the cursor, except during a burst. On the Settings page `view::scene` ends
@@ -434,13 +434,25 @@ pages live in the `retro-look` agent skill (`.agents/skills/retro-look/`).
 Retro sounds: `State::cue` maps Focus/Select/Back/Bump to `Cue::Retro*` while the design is
 `retro`; entering retro Home queues `Cue::Tracking` (not with Reduce motion). `assets/sounds/retro-*.wav`
 follow the click format (48 kHz mono 16-bit, ≤ 250 ms; tracking ≤ 500 ms). The background loop
-`retro-music.wav` is 24 kHz mono (~57 s, ~2.7 MB, end crossfaded into the start) and is mixed in
+`retro-music.wav` is 24 kHz mono (18 bars at 89.5 BPM, 48.27 s, ~2.3 MB, cut on the beat with a 50 ms seam blend) and is mixed in
 the same SDL callback with linear upsampling at `MUSIC_GAIN` 0.14, fading in over 0.8 s and out
 over 0.25 s. The event loop calls `Sounds::set_music(visible && focused &&
 State::retro_music_playing())`, i.e. `Preferences::retro_music` (General row `Setting(14)`, only
 listed with Retro TV, default off, switched on whenever the design is set to Retro), a retro menu
 page (Home or All apps), and no launch in progress. Its position is kept, so
 it resumes where it stopped. Sources and recipe: `tools/sound-design/retro/`.
+
+### RobOS name and design-switch boot
+
+The visible name is **RobOS** (`appinfo.json` `title`, UI strings, retro menu value); the app ID
+`com.ecklf.luma`, executable, install paths, takeover/autostart scripts, update feed and HTTP
+headers stay unchanged, so existing installs update in place. Switching the design (General row
+`Setting(13)`) sets `State::design_boot` and queues `Cue::Boot` (`assets/sounds/robos-boot.wav`, the
+logo sting). `retro_view::design_boot` draws over the page: to Liquid Glass a soft glow and the
+`robos-mark` vector logo with the Inter wordmark (1.6 s); to Retro TV a CRT power-on line opening
+into the blue picture and the outlined wordmark (1.9 s), ending in a hard VHS glitch cut
+(`vhs_cut`, 0.34 s) instead of a fade. `State::tick` keeps it dirty and clears
+it, so the last frame shows the page. Reduce motion skips the animation but keeps the sound.
 
 ### Bing image of the day
 
