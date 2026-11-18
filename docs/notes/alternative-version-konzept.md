@@ -333,3 +333,5 @@ Offene Fragen an den Nutzer: welches Ton-Set, welche Musik? Soll die Musik nur a
   dichte Rauschlinien, Hell-Dunkel-Flackern; nach der Hälfte ist das Boot-Bild weg und die Retro-Seite liegt unter dem Störer.
   Glass blendet weiter weich aus.
 - Freigabe ohne Vorschaubild („du hast die Erlaubnis“), als 3.9.0 gepusht → Test-IPK über PR, Merge erst nach TV-Test.
+- TV-Test 3.9.0: nach Installation per SSH zeigte der TV 3.9.0, aber keine Änderung – die alte Version lief als Startbildschirm
+  weiter im Speicher. Nach Neustart der App (`closeByAppId` bzw. TV-Neustart) läuft 3.9.0. Merke: nach SSH-Installation immer neu starten.
