@@ -242,3 +242,12 @@ Offene Fragen an den Nutzer: welches Ton-Set, welche Musik? Soll die Musik nur a
   bleiben identisch (Test vergleicht die Controls). Wallpaper → Navy, Glas → blaues Verlaufs-Panel mit hellem Rahmen,
   fokussiertes Glas → Gelb, Schatten/Glasränder weg, Ecken max. 6 px, Schrift fett (800) mit hartem Schatten und
   automatisch auf die vorhandene Breite verkleinert, Scanlines. Gilt für alle Bereiche und Unterseiten.
+
+## Vorfall: 3.7.0 friert ein, keine Steuerung (2026-11-18)
+
+- Nach dem Update auf 3.7.0 reagierte Luma nicht mehr auf die Fernbedienung. Das ist dasselbe wie damals bei 3.6.2.
+- Ursache: 3.7.0 baute auf `main` mit der 3.6.2-Änderung auf (Ton-Ausgabe bei Vordergrund und Audiogeräte-Events neu öffnen).
+  Die damals vorbereitete Rücknahme 3.6.3 wurde nie veröffentlicht.
+- Fix 3.7.1 (lokal vorbereitet): Ton-Ausgabe wieder nur einmal beim Start öffnen (wie 3.6.1), kein `resume`/`reconnect` aus der
+  Event-Schleife, Musik setzt nur ein Flag. Retro-Funktionen bleiben.
+- **Regel:** Änderungen an Ton-Ausgabe/Event-Schleife erst per PR-Test-IPK am TV prüfen, dann veröffentlichen.
