@@ -114,3 +114,14 @@ Technik:
   Ein vollständiger VHS-Umbau folgt später.
 - Schrift: Pixel- bzw. OSD-artige Monospace-Schrift mit Lizenz unter `assets/fonts/`.
   Muss die Sprachen abdecken oder für CJK auf die bisherige Schrift zurückfallen.
+
+## Skill-Recherche VHS/Retro-UI (2026-11-18)
+
+Gesucht wurde nach „vhs, retro ui, crt, scanlines, 90s, pixel font, glitch“ in den claude.ai-Skills und im Plugin-Verzeichnis.
+- **Es gibt keinen Skill und kein Plugin speziell für VHS- oder Retro-Look.**
+- Brauchbar ist **`webgl-shaders`** (bereits aktiv): GLSL-Post-Processing, Rauschen, Effekte.
+  Er ist für WebGL im Browser geschrieben, aber das GLSL-Wissen passt auf Lumas OpenGL ES 2 (`src/shaders/*.frag`).
+  Nützlich für Scanlines, Farbsaum (Chroma-Versatz), Tracking-Rauschen und Bildflackern.
+- Allgemeine Design-Plugins (Anthropic „Design“, Superdesign, Refero) haben keinen Retro-Bezug und bringen für ein natives TV-UI wenig.
+- Falls gewünscht, schreiben wir einen eigenen Projekt-Skill `vhs-look`
+  (Farbpalette, OSD-Typografie, Shader-Rezepte, Do/Don't), damit spätere Sitzungen den Stil konsistent halten.
