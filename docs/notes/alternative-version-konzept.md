@@ -78,3 +78,39 @@ Mögliche VHS-Elemente:
 - Uhr im Videorekorder-Stil mit blinkendem „12:00“-Gag, dazu passende Pieps-Sounds
 
 Separate App nur dann, wenn der VHS-Modus später eine komplett andere Bedienlogik bekommen soll.
+
+## Update: VHS-Home bekommt ein eigenes Layout
+
+Anforderung: Im VHS-Modus soll mindestens der **Hauptbildschirm anders aufgebaut** sein, nicht nur anders eingefärbt.
+Es bleibt trotzdem beim Modus statt einer separaten App. Der VHS-Home ist eine eigene Seiten-Variante.
+
+Entwurf (Videorekorder-OSD, 1920×1080):
+
+```
+ ┌──────────────────────────────────────────────────────────┐
+ │  ▶ PLAY                                       12:00  SP  │  OSD-Kopfzeile (Uhr, Wetter als „18°C KLAR“)
+ │                                                          │
+ │            ═══  M A I N   M E N U  ═══                   │
+ │                                                          │
+ │        ▶ 01  NETFLIX                                      │  Favoriten als nummerierte Liste
+ │          02  YOUTUBE                                      │  ▶-Cursor blinkt, Auswahl gelb
+ │          03  PLEX                                         │
+ │          04  ALLE PROGRAMME …                             │  → App-Drawer (ebenfalls als Liste)
+ │          05  EINGANG  (HDMI 1 / HDMI 2 …)                 │
+ │          06  EINSTELLUNGEN                                │
+ │                                                          │
+ │  CH 03                        ◀◀ REW   ▶▶ FF   ■ STOP     │  OSD-Fußzeile mit Tastenhinweisen
+ └──────────────────────────────────────────────────────────┘
+   + Scanlines, leichtes Bildrauschen, „Tracking“-Wackler bei Seitenwechsel
+```
+
+Technik:
+- `view.rs`: `home()` verzweigt nach Design. Für VHS kommt `vhs_home()` dazu.
+- `state.rs`: Auf dem VHS-Home ist die Navigation **Hoch/Runter durch die Liste** statt Links/Rechts durch den Dock.
+  Die vorhandenen `Target`s (Nav, InputsMenu, SettingsMenu …) werden wiederverwendet.
+  Halten von OK und Verschieben funktionieren in der Liste vertikal.
+- Ziffertasten 1–9 der Fernbedienung springen direkt zum Eintrag (passt zum Rekorder-Feeling).
+- Drawer, Settings und Recents bleiben in Phase 1 im normalen Look, bekommen aber den VHS-Farbfilter oder Scanlines.
+  Ein vollständiger VHS-Umbau folgt später.
+- Schrift: Pixel- bzw. OSD-artige Monospace-Schrift mit Lizenz unter `assets/fonts/`.
+  Muss die Sprachen abdecken oder für CJK auf die bisherige Schrift zurückfallen.
