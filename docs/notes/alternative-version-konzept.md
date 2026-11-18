@@ -55,3 +55,26 @@ Takeover, Autostart, Input-Hook-Befehl und Einstellungen funktionieren weiter, o
 Damit laufen beide Versionen nebeneinander und es gibt null Risiko für die stabile Version. Das ist aber **kein** Update:
 Takeover/Autostart müssten auf die neue ID umgestellt werden, und die Einstellungen werden nicht übernommen.
 Das ist nur sinnvoll als Spielwiese, nicht für „nahtlos“.
+
+## Update 2026-11-18: Ziel ist ein 90er-VHS-Menü → Entscheidung Modus statt App
+
+Gewünscht ist ein alternativer **Anzeigemodus** im Look eines 90er-Jahre-VHS-Menüs.
+Empfehlung: **umschaltbarer Modus in Luma** (Einstellungen → General → Design: Liquid Glass / VHS),
+keine separate App und kein zweiter Update-Kanal.
+
+Gründe:
+- Es ändert sich nur das Aussehen. App-Liste, Eingänge, Starten, Takeover und Einstellungen bleiben gleich.
+  Eine zweite App würde all das duplizieren, und beide Versionen würden auseinanderlaufen.
+- Umschalten dauert eine Sekunde, ohne Installation und ohne Downgrade-Risiko.
+- Es gibt schon ein Vorbild: `WeatherStyle` (`src/model.rs`) ist eine gespeicherte Stilwahl mit Vorschau-Picker.
+  Ein `UiTheme`-Enum funktioniert genauso.
+- Gezeichnet wird zentral in `src/view.rs`/`src/renderer.rs`. Der VHS-Modus bekommt eigene Zeichenfunktionen
+  für Home/Drawer/Settings. Navigation und Zustand (`src/state.rs`) bleiben unverändert.
+
+Mögliche VHS-Elemente:
+- blauer Hintergrund, Blockschrift in Weiß/Gelb und ein OSD-Look wie „PLAY ▶“ oder „CH 03“
+- Menüpunkte als Liste mit blinkendem Cursor statt Glas-Karten
+- Scanlines, leichtes Farbflimmern und Tracking-Rauschen beim Seitenwechsel als Shader (`src/shaders/`)
+- Uhr im Videorekorder-Stil mit blinkendem „12:00“-Gag, dazu passende Pieps-Sounds
+
+Separate App nur dann, wenn der VHS-Modus später eine komplett andere Bedienlogik bekommen soll.
