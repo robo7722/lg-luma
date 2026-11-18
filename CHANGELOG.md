@@ -1,5 +1,11 @@
 # lg-luma
 
+## 3.8.0
+
+### Minor Changes
+
+- Retro TV: All apps opens as a retro page with a numbered list, monitor preview and number-key shortcuts, and switching to Retro TV now turns its background music on (it keeps playing on Home and All apps). Retro pages show a faint rolling hum bar and occasional short tracking glitches, off with Reduce motion.
+
 ## 3.7.1
 
 ### Patch Changes

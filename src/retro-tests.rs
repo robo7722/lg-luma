@@ -27,8 +27,11 @@ fn general_setting_toggles_the_design_and_saves() {
     let mut state = ready();
     state.open(2);
     state.focus = Target::Setting(13);
+    assert!(!state.preferences.retro_music);
     assert_eq!(state.activate(), vec![Effect::Save]);
     assert_eq!(state.preferences.design, Design::Retro);
+    // Switching to Retro TV turns its background music on.
+    assert!(state.preferences.retro_music);
     assert!(
         scene(&state)
             .controls
@@ -157,7 +160,7 @@ fn retro_home_draws_no_glass_and_glass_home_is_unchanged() {
 fn other_pages_keep_their_navigation_in_retro_design() {
     let mut state = retro();
     state.open(2);
-    assert!(!state.retro_home());
+    assert!(!state.retro_list());
     assert_eq!(state.focus, Target::Sidebar(0));
 }
 
@@ -191,6 +194,9 @@ fn music_plays_only_on_retro_home_and_stops_for_a_launch() {
     state.launching = true;
     assert!(!state.retro_music_playing());
     state.launching = false;
+    // All apps is a retro menu page too: the music keeps playing there.
+    state.open(1);
+    assert!(state.retro_music_playing());
     state.open(2);
     assert!(!state.retro_music_playing());
     state.open(0);
@@ -254,4 +260,136 @@ fn retro_settings_keep_their_controls_but_lose_the_glass() {
             .iter()
             .any(|draw| matches!(draw, Draw::Glass(..) | Draw::Rim(..) | Draw::Shadow(..)))
     );
+}
+
+#[test]
+fn turning_retro_off_keeps_the_music_choice_but_silences_it() {
+    let mut state = ready();
+    state.open(2);
+    state.focus = Target::Setting(13);
+    state.activate();
+    state.focus = Target::Setting(14);
+    state.activate();
+    assert!(!state.preferences.retro_music, "switched off by hand");
+    state.focus = Target::Setting(13);
+    state.activate();
+    assert_eq!(state.preferences.design, Design::Glass);
+    state.open(0);
+    assert!(!state.retro_music_playing());
+}
+
+fn retro_apps() -> State {
+    let mut state = retro();
+    let all_apps = state
+        .retro_rows()
+        .iter()
+        .position(|row| *row == Target::Nav(1))
+        .unwrap();
+    state.focus = state.retro_rows()[all_apps].clone();
+    state.activate();
+    assert_eq!(state.page, Page::Apps);
+    state
+}
+
+#[test]
+fn all_apps_opens_as_a_retro_list_of_the_drawer_apps() {
+    let state = retro_apps();
+    let rows = state.retro_rows();
+    let drawer: Vec<_> = state
+        .drawer_apps()
+        .iter()
+        .map(|app| Target::App(app.id.clone()))
+        .collect();
+    assert_eq!(rows, drawer);
+    assert_eq!(state.focus, rows[0], "the list starts on its first app");
+    let scene = scene(&state);
+    assert!(
+        !scene
+            .draw
+            .iter()
+            .any(|draw| matches!(draw, Draw::Glass(..) | Draw::Rim(..)))
+    );
+    let targets: Vec<_> = scene.controls.into_iter().map(|c| c.target).collect();
+    assert_eq!(targets, rows[..RETRO_ROWS.min(rows.len())]);
+}
+
+#[test]
+fn all_apps_walks_with_up_and_down_launches_and_goes_back_home() {
+    let mut state = retro_apps();
+    let rows = state.retro_rows();
+    state.direction(Direction::Down, &scene(&state).controls);
+    assert_eq!(state.focus, rows[1]);
+    state.direction(Direction::Right, &scene(&state).controls);
+    assert_eq!(state.focus, rows[1]);
+    for _ in 0..RETRO_ROWS {
+        state.direction(Direction::Down, &scene(&state).controls);
+    }
+    assert_eq!(
+        state.focus,
+        rows[RETRO_ROWS + 1],
+        "the next page follows the focus"
+    );
+    let Target::App(id) = rows[RETRO_ROWS + 1].clone() else {
+        panic!("apps only");
+    };
+    assert_eq!(state.activate(), vec![Effect::Launch(id)]);
+    state.launching = false;
+    state.back();
+    assert_eq!(state.page, Page::Home);
+}
+
+#[test]
+fn all_apps_digits_open_the_row_on_the_current_page() {
+    let mut state = retro_apps();
+    let Target::App(id) = state.retro_rows()[2].clone() else {
+        panic!("apps only");
+    };
+    assert_eq!(state.retro_digit(3), vec![Effect::Launch(id)]);
+}
+
+#[test]
+fn all_apps_move_mode_reorders_with_up_and_down() {
+    let mut state = retro_apps();
+    let first = state.focus.clone();
+    hold_and_move(&mut state);
+    assert_eq!(
+        state.direction(Direction::Down, &scene(&state).controls),
+        vec![Effect::Save]
+    );
+    assert_eq!(state.retro_rows()[1], first);
+    assert_eq!(
+        state.preferences.app_sorting,
+        crate::model::AppSorting::Custom
+    );
+}
+
+#[test]
+fn tv_faults_move_with_the_clock_and_stop_with_reduced_motion() {
+    let assets = view::Assets {
+        root: PathBuf::new(),
+        version: "test".into(),
+        metrics: BTreeMap::new(),
+        artwork: crate::app_artwork::Service::new(false),
+    };
+    let at = |state: &State, ms: i64| {
+        let now = time::OffsetDateTime::UNIX_EPOCH + time::Duration::milliseconds(ms);
+        view::scene(state, &assets, now)
+            .draw
+            .iter()
+            .filter_map(|draw| match draw {
+                Draw::Shape(rect, ..) if rect.w >= 1920. && rect.h < 30. => Some(rect.y),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    let mut state = retro();
+    assert!(state.retro_faults());
+    // Hum bar strips are full-width and change place as the clock moves on.
+    assert_ne!(at(&state, 1_000), at(&state, 2_000));
+    state.preferences.reduced_motion = true;
+    assert!(!state.retro_faults());
+    assert_eq!(at(&state, 1_000), at(&state, 2_000));
+    state.preferences.reduced_motion = false;
+    state.preferences.design = Design::Glass;
+    assert!(!state.retro_faults());
 }

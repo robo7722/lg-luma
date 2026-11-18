@@ -251,3 +251,16 @@ Offene Fragen an den Nutzer: welches Ton-Set, welche Musik? Soll die Musik nur a
 - Fix 3.7.1 (lokal vorbereitet): Ton-Ausgabe wieder nur einmal beim Start öffnen (wie 3.6.1), kein `resume`/`reconnect` aus der
   Event-Schleife, Musik setzt nur ein Flag. Retro-Funktionen bleiben.
 - **Regel:** Änderungen an Ton-Ausgabe/Event-Schleife erst per PR-Test-IPK am TV prüfen, dann veröffentlichen.
+
+## 3.7.1 veröffentlicht, nächste Wünsche (2026-11-18)
+
+- Test-IPK 3.7.1 lief am TV („funktioniert wieder“). PR #14 wurde gemergt, 3.7.1 wird veröffentlicht.
+- Neue Wünsche, lokal umgesetzt, noch nicht hochgeladen:
+  1. **Hintergrundmusik automatisch an** beim Umschalten auf Retro TV (bleibt abschaltbar).
+  2. **„Alle Apps“ als Retro-Fenster mit Auflistung**: Titel „ALLE APPS“, nummerierte Liste der Apps aus der App-Übersicht
+     (ohne Favoriten), Monitor-Vorschau links, Seiten à 9, Zifferntasten, Verschieben mit Hoch/Runter, Ticker unten.
+     Die Musik läuft dort weiter.
+  3. **Animierte Bildfehler** (Wunsch: Scanlines leicht animiert, alte TV-Bildfehler): langsam durchlaufender Brummbalken
+     (9 s pro Durchlauf, sehr dezent) und etwa alle 12 s eine 0,3 s kurze Tracking-Störung mit Flackern.
+     Retro-Seiten zeichnen dafür mit ~12 fps nur den betroffenen Streifen neu. Bei „Bewegungen reduzieren“ ist alles aus.
+     Vorschau-Video: `scratchpad/retro-faults.mp4` (Desktop).

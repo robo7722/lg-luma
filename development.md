@@ -406,16 +406,23 @@ a TV with a PR test IPK before releasing it.
 ### Retro TV design
 
 `Preferences::design` (`glass` default, `retro`) is toggled by General row `Setting(13)`. With
-`retro`, `State::retro_home()` is true on Home and `view::scene` draws `src/retro-view.rs`
-instead of the page, header and glass. Rows come from `State::retro_rows()` (dock favorites,
-then `Nav(1)`, `InputsMenu`, `LumaSettings`, `TvSettings`) and reuse those targets' normal
+`retro`, `State::retro_list()` is true on Home and All apps (`Page::Apps`), and `view::scene`
+draws `retro_view::page` instead of the page, header and glass. Rows come from
+`State::retro_rows()`: on Home dock favorites, then `Nav(1)`, `InputsMenu`, `LumaSettings`,
+`TvSettings`; on All apps the drawer apps (`drawer_apps()`, favorites excluded), starting focused
+on the first. Move there maps Up/Down to `move_in_drawer`'s Left/Right. They reuse the targets' normal
 activation, hold menu and move mode; `State::direction` routes Up/Down through them, and in move
 mode maps Up/Down to the existing Left/Right reorder. `RETRO_ROWS` (9) rows form a page; digit
 keys call `State::retro_digit`. Focus jumps without glide or lift. The event loop's redraw slot
 becomes half a second on retro Home, so only the blinking cursor (and the ticker, which cuts to
 its next message every 8 s) changes while idle; damage tracking keeps those redraws partial. A
 0.24 s band of tracking noise plays while the Home page glide runs (none with Reduce motion).
-Scanlines are static 1.5 px fills every 4 logical px. On the Settings page `view::scene` ends
+Scanlines are static 1.5 px fills every 4 logical px. `retro_view::tv_faults` adds a faint hum bar
+(12 full-width strips, peak 4.5 % white, one roll per 9 s) and, once per 12 s window at a hashed
+moment, a 0.3 s tracking burst (2–5 % flicker plus a band of noisy streaks). Both follow the clock,
+so `--time` captures are reproducible. With `State::retro_faults()` (Retro, no Reduce motion, no
+Recents) the event loop's redraw slot is `RETRO_FAULT_NANOS` (~12 fps); damage tracking limits
+each frame to the bar's strip and the cursor, except during a burst. On the Settings page `view::scene` ends
 with `retro_view::restyle`, which rewrites the finished Glass scene instead of a second layout:
 wallpaper → navy, light (focused) glass → yellow, other glass → gradient panel with frame,
 rims and soft shadows dropped, corners ≤ 6 px, text weight 800 with a hard shadow (single-line
@@ -429,7 +436,8 @@ follow the click format (48 kHz mono 16-bit, ≤ 250 ms; tracking ≤ 500 ms). T
 the same SDL callback with linear upsampling at `MUSIC_GAIN` 0.14, fading in over 0.8 s and out
 over 0.25 s. The event loop calls `Sounds::set_music(visible && focused &&
 State::retro_music_playing())`, i.e. `Preferences::retro_music` (General row `Setting(14)`, only
-listed with Retro TV, default off), retro Home, and no launch in progress. Its position is kept, so
+listed with Retro TV, default off, switched on whenever the design is set to Retro), a retro menu
+page (Home or All apps), and no launch in progress. Its position is kept, so
 it resumes where it stopped. Sources and recipe: `tools/sound-design/retro/`.
 
 ### Bing image of the day

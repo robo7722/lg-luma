@@ -688,6 +688,8 @@ fn companion(
 
 /// Half a period of the retro cursor blink (1 Hz), in nanoseconds.
 pub const RETRO_BLINK_NANOS: i128 = 500_000_000;
+/// Frame step of the retro picture faults (hum bar, tracking bursts): about 12 fps.
+pub const RETRO_FAULT_NANOS: i128 = 83_333_333;
 
 fn c(rgb: u32, alpha: f32) -> Color {
     [
@@ -765,9 +767,9 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
         }
         return out;
     }
-    if state.retro_home() {
-        // The retro Home draws its own full-screen layout, header and ticker included.
-        retro_view::home(&mut out, state, assets, now);
+    if state.retro_list() {
+        // Retro Home and All apps draw their own full-screen layout, header and ticker included.
+        retro_view::page(&mut out, state, assets, now);
     } else {
         let viewport = state.content_viewport();
         let main_bottom = viewport.y + viewport.h;
@@ -947,6 +949,7 @@ pub fn scene(state: &State, assets: &Assets, now: OffsetDateTime) -> Scene {
         && !recents_replaces_page(state)
     {
         retro_view::restyle(&mut out, assets, 0);
+        retro_view::tv_faults(&mut out, now, state.preferences.reduced_motion);
     }
     if let Some((notice, _)) = &state.notice {
         toast(&mut out, state, assets, notice);

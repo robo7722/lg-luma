@@ -777,13 +777,30 @@ impl State {
         pending
     }
 
-    /// Home drawn as the retro TV info-channel menu (Recents still uses its own view).
-    pub fn retro_home(&self) -> bool {
-        self.preferences.design == crate::model::Design::Retro && self.page == Page::Home
+    /// A retro page showing the animated old-TV picture faults: the menu pages and Settings,
+    /// unless motion is reduced or Recent apps covers the page.
+    pub fn retro_faults(&self) -> bool {
+        self.preferences.design == crate::model::Design::Retro
+            && !self.preferences.reduced_motion
+            && !self.recents_open()
     }
 
-    /// The Retro Home menu, top to bottom: favorites, then all apps, inputs and both settings.
+    /// A retro TV menu page: Home, or All apps as a numbered list.
+    pub fn retro_list(&self) -> bool {
+        self.preferences.design == crate::model::Design::Retro
+            && matches!(self.page, Page::Home | Page::Apps)
+    }
+
+    /// The rows of the current retro menu page: All apps lists the drawer's apps; Home lists
+    /// favorites, then all apps, inputs and both settings.
     pub fn retro_rows(&self) -> Vec<Target> {
+        if self.page == Page::Apps {
+            return self
+                .drawer_apps()
+                .iter()
+                .map(|app| Target::App(app.id.clone()))
+                .collect();
+        }
         let mut rows: Vec<_> = self
             .dock_apps()
             .iter()
@@ -800,6 +817,9 @@ impl State {
 
     fn retro_direction(&mut self, direction: Direction, controls: &[Control]) {
         let rows = self.retro_rows();
+        if rows.is_empty() {
+            return;
+        }
         let index = rows.iter().position(|row| *row == self.focus);
         let next = match (direction, index) {
             (_, None) => 0,
@@ -812,7 +832,7 @@ impl State {
 
     /// Number keys 1–9 pick the retro menu row with that number on the current menu page.
     pub fn retro_digit(&mut self, digit: usize) -> Vec<Effect> {
-        if !self.retro_home() || self.overlay.is_some() || self.moving.is_some() || digit == 0 {
+        if !self.retro_list() || self.overlay.is_some() || self.moving.is_some() || digit == 0 {
             return vec![];
         }
         let rows = self.retro_rows();
@@ -844,7 +864,7 @@ impl State {
         self.moving = None;
         self.subpage = None;
         self.panel_started = None;
-        if self.page == Page::Home {
+        if self.page == Page::Home || (self.page == Page::Apps && self.retro_list()) {
             self.focus = self.first_content();
         } else if self.page == Page::Settings {
             self.section = 0;
@@ -1282,8 +1302,10 @@ impl State {
     }
 
     pub fn first_content(&self) -> Target {
-        if self.retro_home() {
-            return self.retro_rows().swap_remove(0);
+        if self.retro_list()
+            && let Some(row) = self.retro_rows().into_iter().next()
+        {
+            return row;
         }
         match self.page {
             Page::Home => self
@@ -1678,7 +1700,7 @@ impl State {
             return vec![];
         }
         // Retro Home is one vertical list: Up/Down walk it, and in move mode they reorder.
-        let direction = if self.retro_home() && self.overlay.is_none() {
+        let direction = if self.retro_list() && self.overlay.is_none() {
             if self.moving.is_none() {
                 self.retro_direction(direction, controls);
                 return vec![];
@@ -2480,7 +2502,7 @@ impl State {
 
     /// Whether the Retro TV background music should be heard now.
     pub fn retro_music_playing(&self) -> bool {
-        self.preferences.retro_music && self.retro_home() && !self.launching
+        self.preferences.retro_music && self.retro_list() && !self.launching
     }
 
     /// Remote arrow keys: `direction` plus a Focus click when anything moved, or a Bump when
@@ -3181,6 +3203,11 @@ impl State {
                     14 => self.preferences.retro_music = !self.preferences.retro_music,
                     13 => {
                         self.preferences.design = self.preferences.design.toggled();
+                        // Switching to Retro TV turns its background music on; it can still
+                        // be switched off below the Design row.
+                        if self.preferences.design == crate::model::Design::Retro {
+                            self.preferences.retro_music = true;
+                        }
                         // Leave any Home glide or lens behind: the other design draws no glass.
                         self.focus_from = None;
                         self.focus_lifted = None;
